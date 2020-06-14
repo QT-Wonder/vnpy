@@ -8,9 +8,11 @@ from rqdatac.services.basic import all_instruments as rqdata_all_instruments
 from rqdatac.services.get_price import get_price as rqdata_get_price
 from rqdatac.share.errors import AuthenticationFailed
 
-from .setting import SETTINGS
-from .constant import Exchange, Interval
-from .object import BarData, HistoryRequest
+from vnpy.trader.mddata.dataapi import MdDataApi
+
+from vnpy.trader.setting import SETTINGS
+from vnpy.trader.constant import Exchange, Interval
+from vnpy.trader.object import BarData, HistoryRequest
 
 
 INTERVAL_VT2RQ = {
@@ -28,7 +30,7 @@ INTERVAL_ADJUSTMENT_MAP = {
 CHINA_TZ = timezone("Asia/Shanghai")
 
 
-class RqdataClient:
+class RqdataClient(MdDataApi):
     """
     Client for querying history data from RQData.
     """
@@ -194,4 +196,4 @@ class RqdataClient:
         return data
 
 
-rqdata_client = RqdataClient()
+mddata_client = RqdataClient()

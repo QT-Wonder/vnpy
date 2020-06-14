@@ -24,6 +24,11 @@ SETTINGS: Dict[str, Any] = {
     "email.sender": "",
     "email.receiver": "",
 
+    "mddata.api": "jqdata",
+
+    "jqdata.username": "",
+    "jqdata.password": "",
+
     "rqdata.username": "",
     "rqdata.password": "",
 

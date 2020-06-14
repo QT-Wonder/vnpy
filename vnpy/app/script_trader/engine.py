@@ -26,7 +26,7 @@ from vnpy.trader.object import (
     LogData,
     BarData
 )
-from vnpy.trader.rqdata import rqdata_client
+from vnpy.trader.mddata import mddata_client
 
 
 APP_NAME = "ScriptTrader"
@@ -49,7 +49,7 @@ class ScriptEngine(BaseEngine):
         """
         Start script engine.
         """
-        result = rqdata_client.init()
+        result = mddata_client.init()
         if result:
             self.write_log("RQData数据接口初始化成功")
 
@@ -257,7 +257,7 @@ class ScriptEngine(BaseEngine):
             interval=interval
         )
 
-        return get_data(rqdata_client.query_history, arg=req, use_df=use_df)
+        return get_data(mddata_client.query_history, arg=req, use_df=use_df)
 
     def write_log(self, msg: str) -> None:
         """"""

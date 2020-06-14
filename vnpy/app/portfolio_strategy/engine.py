@@ -39,7 +39,7 @@ from vnpy.trader.constant import (
 )
 from vnpy.trader.utility import load_json, save_json, extract_vt_symbol, round_to
 from vnpy.trader.database import database_manager
-from vnpy.trader.rqdata import rqdata_client
+from vnpy.trader.mddata import mddata_client
 from vnpy.trader.converter import OffsetConverter
 
 from .base import (
@@ -99,7 +99,7 @@ class StrategyEngine(BaseEngine):
         """
         Init RQData client.
         """
-        result = rqdata_client.init()
+        result = mddata_client.init()
         if result:
             self.write_log("RQData数据接口初始化成功")
 
@@ -116,7 +116,7 @@ class StrategyEngine(BaseEngine):
             start=start,
             end=end
         )
-        data = rqdata_client.query_history(req)
+        data = mddata_client.query_history(req)
         return data
 
     def process_tick_event(self, event: Event):

@@ -28,6 +28,10 @@ class BacktesterManager(QtWidgets.QWidget):
 
     setting_filename = "cta_backtester_setting.json"
 
+    bulk_backtest_result = ""
+    is_bulk_backtest = False
+    current_bulkd_backtest = 0
+
     signal_log = QtCore.pyqtSignal(Event)
     signal_backtesting_finished = QtCore.pyqtSignal(Event)
     signal_optimization_finished = QtCore.pyqtSignal(Event)
@@ -100,6 +104,9 @@ class BacktesterManager(QtWidgets.QWidget):
         backtesting_button = QtWidgets.QPushButton("开始回测")
         backtesting_button.clicked.connect(self.start_backtesting)
 
+        bulk_backtesting_button = QtWidgets.QPushButton("批量回测")
+        bulk_backtesting_button.clicked.connect(self.start_bulk_backtesting)
+
         optimization_button = QtWidgets.QPushButton("参数优化")
         optimization_button.clicked.connect(self.start_optimization)
 
@@ -134,6 +141,7 @@ class BacktesterManager(QtWidgets.QWidget):
 
         for button in [
             backtesting_button,
+            bulk_backtesting_button,
             optimization_button,
             downloading_button,
             self.result_button,
@@ -169,6 +177,7 @@ class BacktesterManager(QtWidgets.QWidget):
         left_vbox.addLayout(form)
         left_vbox.addWidget(backtesting_button)
         left_vbox.addWidget(downloading_button)
+        left_vbox.addWidget(bulk_backtesting_button)
         left_vbox.addStretch()
         left_vbox.addLayout(result_grid)
         left_vbox.addStretch()
@@ -288,10 +297,109 @@ class BacktesterManager(QtWidgets.QWidget):
         self.daily_button.setEnabled(True)
         self.candle_button.setEnabled(True)
 
+        if self.is_bulk_backtest:
+            class_name = self.class_names[self.current_bulkd_backtest]
+            # output sharpe_ratio as example for bulk backtest
+            self.bulk_backtest_result = self.bulk_backtest_result + "\nstrategy: [" + statistics["class_name"] + "]夏普比率: " + statistics["sharpe_ratio"]
+            self.current_bulkd_backtest = self.current_bulkd_backtest + 1
+            if self.current_bulkd_backtest < len(self.class_names):
+                class_name = self.class_names[self.current_bulkd_backtest]
+                self.write_log("开始回测" + class_name)
+                self.backtest(class_name)
+            else:
+                self.write_log("----------批量回测结果--------")
+                self.write_log(self.bulk_backtest_result)
+                self.write_log("")
+                self.write_log("-----------------------------")
+                self.is_bulk_backtest = False
+                self.current_bulkd_backtest = 0
+                self.bulk_backtest_result = ""
+
+
     def process_optimization_finished_event(self, event: Event):
         """"""
         self.write_log("请点击[优化结果]按钮查看")
         self.result_button.setEnabled(True)
+
+    def start_bulk_backtesting(self):
+        if len(self.class_names) < 1:
+            return
+        self.is_bulk_backtest = True
+        self.current_bulkd_backtest = 0
+        self.bulk_backtest_result = ""
+        class_name = self.class_names[0]
+        self.backtest(class_name)
+
+    def backtest(self, class_name: str):
+        """"""
+        vt_symbol = self.symbol_line.text()
+        interval = self.interval_combo.currentText()
+        start = self.start_date_edit.date().toPyDate()
+        end = self.end_date_edit.date().toPyDate()
+        rate = float(self.rate_line.text())
+        slippage = float(self.slippage_line.text())
+        size = float(self.size_line.text())
+        pricetick = float(self.pricetick_line.text())
+        capital = float(self.capital_line.text())
+
+        if self.inverse_combo.currentText() == "正向":
+            inverse = False
+        else:
+            inverse = True
+
+        # Save backtesting parameters
+        backtesting_setting = {
+            "class_name": class_name,
+            "vt_symbol": vt_symbol,
+            "interval": interval,
+            "rate": rate,
+            "slippage": slippage,
+            "size": size,
+            "pricetick": pricetick,
+            "capital": capital,
+            "inverse": inverse,
+        }
+        save_json(self.setting_filename, backtesting_setting)
+
+        # use existing setting
+        # Get strategy setting
+        # old_setting = self.settings[class_name]
+        # dialog = BacktestingSettingEditor(class_name, old_setting)
+        # i = dialog.exec()
+        # if i != dialog.Accepted:
+        #     return
+
+        # new_setting = dialog.get_setting()
+        # self.settings[class_name] = new_setting
+
+        result = self.backtester_engine.start_backtesting(
+            class_name,
+            vt_symbol,
+            interval,
+            start,
+            end,
+            rate,
+            slippage,
+            size,
+            pricetick,
+            capital,
+            inverse,
+            self.settings[class_name]
+        )
+
+        if result:
+            self.statistics_monitor.clear_data()
+            self.chart.clear_data()
+
+            self.trade_button.setEnabled(False)
+            self.order_button.setEnabled(False)
+            self.daily_button.setEnabled(False)
+            self.candle_button.setEnabled(False)
+
+            self.trade_dialog.clear_data()
+            self.order_dialog.clear_data()
+            self.daily_dialog.clear_data()
+            self.candle_dialog.clear_data()
 
     def start_backtesting(self):
         """"""

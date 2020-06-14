@@ -482,6 +482,7 @@ class BacktestingEngine:
             self.output(f"收益回撤比：\t{return_drawdown_ratio:,.2f}")
 
         statistics = {
+            "class_name": self.strategy_class.__name__,
             "start_date": start_date,
             "end_date": end_date,
             "total_days": total_days,

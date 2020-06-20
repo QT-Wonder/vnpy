@@ -28,7 +28,7 @@ class BacktesterManager(QtWidgets.QWidget):
 
     setting_filename = "cta_backtester_setting.json"
 
-    bulk_backtest_result = ""
+    bulk_backtest_result = {}
     is_bulk_backtest = False
     current_bulkd_backtest = 0
 
@@ -300,21 +300,27 @@ class BacktesterManager(QtWidgets.QWidget):
         if self.is_bulk_backtest:
             class_name = self.class_names[self.current_bulkd_backtest]
             # output sharpe_ratio as example for bulk backtest
-            self.bulk_backtest_result = self.bulk_backtest_result + "\nstrategy: [" + statistics["class_name"] + "]夏普比率: " + statistics["sharpe_ratio"]
+            self.bulk_backtest_result[statistics["class_name"]] = statistics
             self.current_bulkd_backtest = self.current_bulkd_backtest + 1
             if self.current_bulkd_backtest < len(self.class_names):
                 class_name = self.class_names[self.current_bulkd_backtest]
-                self.write_log("开始回测" + class_name)
                 self.backtest(class_name)
             else:
                 self.write_log("----------批量回测结果--------")
-                self.write_log(self.bulk_backtest_result)
-                self.write_log("")
+                self.write_bulk_backtest_to_csv("bulktestresult.csv")
+                self.write_log("结果写入： bulktestresult.csv")
                 self.write_log("-----------------------------")
                 self.is_bulk_backtest = False
                 self.current_bulkd_backtest = 0
-                self.bulk_backtest_result = ""
+                self.bulk_backtest_result = {}
 
+    def write_bulk_backtest_to_csv(self, path: str):
+        with open(path, mode='w', encoding='utf-8-sig', newline='') as csv_file:
+            writer = csv.writer(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+
+            writer.writerow(['策略','首个交易日','最后交易日','总交易日','盈利交易日','亏损交易日','起始资金','结束资金','总收益率','年化收益','最大回撤','百分比最大回撤','最长回撤天数','总盈亏','总手续费','总滑点','总成交金额','总成交笔数','日均盈亏','日均手续费','日均滑点','日均成交金额','日均成交笔数','日均收益率','收益标准差','Sharpe Ratio','收益回撤比'])
+            for strategy in self.bulk_backtest_result:
+                writer.writerow(list(self.bulk_backtest_result[strategy].values()))
 
     def process_optimization_finished_event(self, event: Event):
         """"""
@@ -326,7 +332,7 @@ class BacktesterManager(QtWidgets.QWidget):
             return
         self.is_bulk_backtest = True
         self.current_bulkd_backtest = 0
-        self.bulk_backtest_result = ""
+        self.bulk_backtest_result = {}
         class_name = self.class_names[0]
         self.backtest(class_name)
 

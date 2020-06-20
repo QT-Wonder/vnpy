@@ -483,29 +483,36 @@ class BacktestingEngine:
 
         statistics = {
             "class_name": self.strategy_class.__name__,
+
             "start_date": start_date,
             "end_date": end_date,
+
             "total_days": total_days,
             "profit_days": profit_days,
             "loss_days": loss_days,
+
             "capital": self.capital,
             "end_balance": end_balance,
+
+            "total_return": total_return,
+            "annual_return": annual_return,
             "max_drawdown": max_drawdown,
             "max_ddpercent": max_ddpercent,
             "max_drawdown_duration": max_drawdown_duration,
+
             "total_net_pnl": total_net_pnl,
-            "daily_net_pnl": daily_net_pnl,
             "total_commission": total_commission,
-            "daily_commission": daily_commission,
             "total_slippage": total_slippage,
-            "daily_slippage": daily_slippage,
             "total_turnover": total_turnover,
-            "daily_turnover": daily_turnover,
             "total_trade_count": total_trade_count,
+
+            "daily_net_pnl": daily_net_pnl,
+            "daily_commission": daily_commission,
+            "daily_slippage": daily_slippage,
+            "daily_turnover": daily_turnover,
             "daily_trade_count": daily_trade_count,
-            "total_return": total_return,
-            "annual_return": annual_return,
             "daily_return": daily_return,
+            
             "return_std": return_std,
             "sharpe_ratio": sharpe_ratio,
             "return_drawdown_ratio": return_drawdown_ratio,

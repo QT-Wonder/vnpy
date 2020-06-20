@@ -298,8 +298,6 @@ class BacktesterManager(QtWidgets.QWidget):
         self.candle_button.setEnabled(True)
 
         if self.is_bulk_backtest:
-            class_name = self.class_names[self.current_bulkd_backtest]
-            # output sharpe_ratio as example for bulk backtest
             self.bulk_backtest_result[statistics["class_name"]] = statistics
             self.current_bulkd_backtest = self.current_bulkd_backtest + 1
             if self.current_bulkd_backtest < len(self.class_names):
@@ -318,7 +316,7 @@ class BacktesterManager(QtWidgets.QWidget):
         with open(path, mode='w', encoding='utf-8-sig', newline='') as csv_file:
             writer = csv.writer(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
-            writer.writerow(['策略','首个交易日','最后交易日','总交易日','盈利交易日','亏损交易日','起始资金','结束资金','总收益率','年化收益','最大回撤','百分比最大回撤','最长回撤天数','总盈亏','总手续费','总滑点','总成交金额','总成交笔数','日均盈亏','日均手续费','日均滑点','日均成交金额','日均成交笔数','日均收益率','收益标准差','Sharpe Ratio','收益回撤比'])
+            writer.writerow(['策略','首个交易日','最后交易日','总交易日','盈利交易日','亏损交易日','起始资金','结束资金','总收益率','年化收益','最大回撤','百分比最大回撤','最长回撤天数','总盈亏','总手续费','总滑点','总成交金额','总成交笔数','日均盈亏','日均手续费','日均滑点','日均成交金额','日均成交笔数','日均收益率','收益标准差','夏普比率','收益回撤比'])
             for strategy in self.bulk_backtest_result:
                 writer.writerow(list(self.bulk_backtest_result[strategy].values()))
 

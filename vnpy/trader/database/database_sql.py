@@ -423,6 +423,24 @@ class SqlManager(BaseDatabaseManager):
             return s.to_bar()
         return None
 
+    # Added
+    def get_oldest_tick_data(
+        self, symbol: str, exchange: "Exchange"
+    ) -> Optional["TickData"]:
+        s = (
+            self.class_tick.select()
+                .where(
+                (self.class_tick.symbol == symbol)
+                & (self.class_tick.exchange == exchange.value)
+            )
+            .order_by(self.class_tick.datetime.asc())
+            .first()
+        )
+        if s:
+            return s.to_tick()
+        return None
+
+
     def get_newest_tick_data(
         self, symbol: str, exchange: "Exchange"
     ) -> Optional["TickData"]:
@@ -438,6 +456,31 @@ class SqlManager(BaseDatabaseManager):
         if s:
             return s.to_tick()
         return None
+
+    # Added
+    def get_tick_data_statistics(self) -> List[Dict]:
+        """"""
+        s = (
+            self.class_tick.select(
+                self.class_tick.symbol,
+                self.class_tick.exchange,
+                fn.COUNT(self.class_tick.id).alias("count")
+            ).group_by(
+                self.class_tick.symbol,
+                self.class_tick.exchange
+            )
+        )
+
+        result = []
+
+        for data in s:
+            result.append({
+                "symbol": data.symbol,
+                "exchange": data.exchange,
+                "count": data.count
+            })
+
+        return result
 
     def get_bar_data_statistics(self) -> List[Dict]:
         """"""
@@ -479,6 +522,22 @@ class SqlManager(BaseDatabaseManager):
             (self.class_bar.symbol == symbol)
             & (self.class_bar.exchange == exchange.value)
             & (self.class_bar.interval == interval.value)
+        )
+        count = query.execute()
+        return count
+
+    # Added
+    def delete_tick_data(
+        self,
+        symbol: str,
+        exchange: "Exchange"
+    ) -> int:
+        """
+        Delete all tick data with given symbol + exchange + interval.
+        """
+        query = self.class_tick.delete().where(
+            (self.class_tick.symbol == symbol)
+            & (self.class_tick.exchange == exchange.value)
         )
         count = query.execute()
         return count

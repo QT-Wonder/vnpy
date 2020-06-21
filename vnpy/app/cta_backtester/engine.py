@@ -15,6 +15,7 @@ from vnpy.trader.mddata import mddata_client
 from vnpy.trader.database import database_manager
 from vnpy.app.cta_strategy import CtaTemplate
 from vnpy.app.cta_strategy.backtesting import BacktestingEngine, OptimizationSetting
+from vnpy.app.cta_strategy.base import BacktestingMode
 
 APP_NAME = "CtaBacktester"
 
@@ -138,7 +139,8 @@ class BacktesterEngine(BaseEngine):
         pricetick: float,
         capital: int,
         inverse: bool,
-        setting: dict
+        setting: dict,
+        backtest_mode: BacktestingMode
     ):
         """"""
         self.result_df = None
@@ -157,6 +159,7 @@ class BacktesterEngine(BaseEngine):
             size=size,
             pricetick=pricetick,
             capital=capital,
+            mode=backtest_mode,
             inverse=inverse
         )
 
@@ -191,7 +194,8 @@ class BacktesterEngine(BaseEngine):
         pricetick: float,
         capital: int,
         inverse: bool,
-        setting: dict
+        setting: dict,
+        backtest_mode: BacktestingMode
     ):
         if self.thread:
             self.write_log("已有任务在运行中，请等待完成")
@@ -212,7 +216,8 @@ class BacktesterEngine(BaseEngine):
                 pricetick,
                 capital,
                 inverse,
-                setting
+                setting,
+                backtest_mode
             )
         )
         self.thread.start()

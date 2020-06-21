@@ -21,6 +21,7 @@ from ..engine import (
     EVENT_BACKTESTER_OPTIMIZATION_FINISHED,
     OptimizationSetting
 )
+from vnpy.app.cta_strategy.base import BacktestingMode
 
 
 class BacktesterManager(QtWidgets.QWidget):
@@ -73,6 +74,10 @@ class BacktesterManager(QtWidgets.QWidget):
         self.class_combo = QtWidgets.QComboBox()
 
         self.symbol_line = QtWidgets.QLineEdit("IF88.CFFEX")
+
+        self.backtest_mode_combo = QtWidgets.QComboBox()
+        self.backtest_mode_combo.addItem("BAR")
+        self.backtest_mode_combo.addItem("TICK")
 
         self.interval_combo = QtWidgets.QComboBox()
         for inteval in Interval:
@@ -156,6 +161,7 @@ class BacktesterManager(QtWidgets.QWidget):
 
         form = QtWidgets.QFormLayout()
         form.addRow("交易策略", self.class_combo)
+        form.addRow("回测模式", self.backtest_mode_combo)
         form.addRow("本地代码", self.symbol_line)
         form.addRow("K线周期", self.interval_combo)
         form.addRow("开始日期", self.start_date_edit)
@@ -237,6 +243,11 @@ class BacktesterManager(QtWidgets.QWidget):
         setting = load_json(self.setting_filename)
         if not setting:
             return
+
+        if "backtest_mode" in setting:
+            self.backtest_mode_combo.setCurrentIndex(
+                self.backtest_mode_combo.findText(setting["backtest_mode"])
+            )
 
         self.class_combo.setCurrentIndex(
             self.class_combo.findText(setting["class_name"])
@@ -407,6 +418,7 @@ class BacktesterManager(QtWidgets.QWidget):
 
     def start_backtesting(self):
         """"""
+        backtest_mode = self.backtest_mode_combo.currentText()
         class_name = self.class_combo.currentText()
         vt_symbol = self.symbol_line.text()
         interval = self.interval_combo.currentText()
@@ -434,6 +446,7 @@ class BacktesterManager(QtWidgets.QWidget):
             "pricetick": pricetick,
             "capital": capital,
             "inverse": inverse,
+            "backtest_mode": backtest_mode
         }
         save_json(self.setting_filename, backtesting_setting)
 
@@ -459,7 +472,8 @@ class BacktesterManager(QtWidgets.QWidget):
             pricetick,
             capital,
             inverse,
-            new_setting
+            new_setting,
+            BacktestingMode.TICK if backtest_mode == 'TICK' else BacktestingMode.BAR
         )
 
         if result:

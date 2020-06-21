@@ -8,6 +8,7 @@ from vnpy.trader.object import BarData, TickData, OrderData, TradeData
 from vnpy.trader.utility import virtual
 
 from .base import StopOrder, EngineType
+from vnpy.app.cta_strategy.base import BacktestingMode
 
 
 class CtaTemplate(ABC):
@@ -93,7 +94,7 @@ class CtaTemplate(ABC):
         return strategy_data
 
     @virtual
-    def on_init(self):
+    def on_init(self, mode: BacktestingMode):
         """
         Callback when strategy is inited.
         """

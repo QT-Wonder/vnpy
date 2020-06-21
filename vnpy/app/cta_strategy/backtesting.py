@@ -270,7 +270,7 @@ class BacktestingEngine:
         else:
             func = self.new_tick
 
-        self.strategy.on_init()
+        self.strategy.on_init(self.mode)
 
         # Use the first [days] of history data for initializing strategy
         day_count = 0

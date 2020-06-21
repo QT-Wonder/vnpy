@@ -9,6 +9,7 @@ from vnpy.app.cta_strategy import (
     CtaSignal,
     TargetPosTemplate
 )
+from vnpy.app.cta_strategy.base import BacktestingMode
 
 
 class RsiSignal(CtaSignal):
@@ -163,12 +164,15 @@ class MultiSignalStrategy(TargetPosTemplate):
             "ma": 0
         }
 
-    def on_init(self):
+    def on_init(self, mode):
         """
         Callback when strategy is inited.
         """
         self.write_log("策略初始化")
-        self.load_bar(10)
+        if mode == BacktestingMode.TICK:
+            self.load_tick(1)
+        else:
+            self.load_bar(10)
 
     def on_start(self):
         """

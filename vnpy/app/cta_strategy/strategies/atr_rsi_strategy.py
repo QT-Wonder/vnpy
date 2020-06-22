@@ -8,6 +8,7 @@ from vnpy.app.cta_strategy import (
     BarGenerator,
     ArrayManager,
 )
+from vnpy.app.cta_strategy.base import BacktestingMode
 
 
 class AtrRsiStrategy(CtaTemplate):
@@ -54,7 +55,7 @@ class AtrRsiStrategy(CtaTemplate):
         self.bg = BarGenerator(self.on_bar)
         self.am = ArrayManager()
 
-    def on_init(self):
+    def on_init(self, mode: BacktestingMode):
         """
         Callback when strategy is inited.
         """
@@ -63,7 +64,11 @@ class AtrRsiStrategy(CtaTemplate):
         self.rsi_buy = 50 + self.rsi_entry
         self.rsi_sell = 50 - self.rsi_entry
 
-        self.load_bar(10)
+        if mode == BacktestingMode.TICK:
+            self.load_tick(1)
+        else:
+            self.load_bar(10)
+        
 
     def on_start(self):
         """

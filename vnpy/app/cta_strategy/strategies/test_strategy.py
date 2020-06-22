@@ -36,7 +36,7 @@ class TestStrategy(CtaTemplate):
         ]
         self.last_tick = None
 
-    def on_init(self):
+    def on_init(self, mode):
         """
         Callback when strategy is inited.
         """

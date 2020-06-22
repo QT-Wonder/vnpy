@@ -8,6 +8,7 @@ from vnpy.app.cta_strategy import (
     BarGenerator,
     ArrayManager,
 )
+from vnpy.app.cta_strategy.base import BacktestingMode
 
 
 class KingKeltnerStrategy(CtaTemplate):
@@ -41,12 +42,15 @@ class KingKeltnerStrategy(CtaTemplate):
         self.bg = BarGenerator(self.on_bar, 5, self.on_5min_bar)
         self.am = ArrayManager()
 
-    def on_init(self):
+    def on_init(self, mode):
         """
         Callback when strategy is inited.
         """
         self.write_log("策略初始化")
-        self.load_bar(10)
+        if mode == BacktestingMode.TICK:
+            self.load_tick(1)
+        else:
+            self.load_bar(10)
 
     def on_start(self):
         """

@@ -15,6 +15,7 @@ from datetime import datetime
 import jqdatasdk as jq
 import pandas as pd
 from vnpy.trader.setting import SETTINGS
+from vnpy.app.cta_strategy.base import BacktestingMode
 
 class DemoStrategy(CtaTemplate):
     author = "QT-WOnder"
@@ -57,16 +58,16 @@ class DemoStrategy(CtaTemplate):
         self.bg = BarGenerator(self.on_bar)
         self.am = ArrayManager(self.config["k"] + self.config["n"])
 
-    def on_init(self):
+    def on_init(self, mode: BacktestingMode):
         """
         Callback when strategy is inited.
         """
         print("策略初始化")
-
-
-
-        # 初始化bar数据
-        self.load_tick(10)
+        
+        if mode == BacktestingMode.TICK:
+            self.load_tick(1)
+        else:
+            self.load_bar(10)
 
     def on_start(self):
         """

@@ -112,7 +112,7 @@ class TickManagerWidget(QtWidgets.QWidget):
 
     def clear_tree(self) -> None:
         """"""
-        for item in self.tree_items.items():
+        for key, item in self.tree_items.items():
             self.tick_child.removeChild(item)
         self.tree_items.clear()
 

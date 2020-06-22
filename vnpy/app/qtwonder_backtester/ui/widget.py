@@ -24,7 +24,7 @@ from ..engine import (
 from vnpy.app.cta_strategy.base import BacktestingMode
 
 
-class BacktesterManager(QtWidgets.QWidget):
+class QTWonderBacktesterManager(QtWidgets.QWidget):
     """"""
 
     setting_filename = "cta_backtester_setting.json"

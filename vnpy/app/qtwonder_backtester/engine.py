@@ -17,16 +17,16 @@ from vnpy.app.cta_strategy import CtaTemplate
 from vnpy.app.cta_strategy.backtesting import BacktestingEngine, OptimizationSetting
 from vnpy.app.cta_strategy.base import BacktestingMode
 
-APP_NAME = "CtaBacktester"
+APP_NAME = "QTWonderBacktester"
 
 EVENT_BACKTESTER_LOG = "eBacktesterLog"
 EVENT_BACKTESTER_BACKTESTING_FINISHED = "eBacktesterBacktestingFinished"
 EVENT_BACKTESTER_OPTIMIZATION_FINISHED = "eBacktesterOptimizationFinished"
 
 
-class BacktesterEngine(BaseEngine):
+class QTWonderBacktesterEngine(BaseEngine):
     """
-    For running CTA strategy backtesting.
+    Customized engine for running CTA strategy backtesting.
     """
 
     def __init__(self, main_engine: MainEngine, event_engine: EventEngine):
@@ -46,7 +46,7 @@ class BacktesterEngine(BaseEngine):
 
     def init_engine(self):
         """"""
-        self.write_log("初始化CTA回测引擎")
+        self.write_log("初始化QT_Wonder CTA回测引擎")
 
         self.backtesting_engine = BacktestingEngine()
         # Redirect log from backtesting engine outside.

@@ -1,1 +1,1 @@
-from .widget import BacktesterManager
+from .widget import QTWonderBacktesterManager

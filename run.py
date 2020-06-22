@@ -52,6 +52,7 @@ from vnpy.app.portfolio_manager import PortfolioManagerApp
 # from vnpy.app.excel_rtd import ExcelRtdApp
 from vnpy.app.data_manager import DataManagerApp
 from vnpy.app.tick_data_manager import TickDataManagerApp
+from vnpy.app.qtwonder_backtester import QTWonderCtaBacktesterApp
 from vnpy.app.portfolio_strategy import PortfolioStrategyApp
 
 
@@ -111,6 +112,7 @@ def main():
     # main_engine.add_app(ExcelRtdApp)
     main_engine.add_app(DataManagerApp)
     main_engine.add_app(TickDataManagerApp)
+    main_engine.add_app(QTWonderCtaBacktesterApp)
     main_engine.add_app(PortfolioStrategyApp)
     
     main_window = MainWindow(main_engine, event_engine)

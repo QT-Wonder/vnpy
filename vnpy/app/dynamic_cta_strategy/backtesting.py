@@ -28,7 +28,7 @@ from .base import (
     StopOrderStatus,
     INTERVAL_DELTA_MAP
 )
-from .template import CtaTemplate
+from .template import DynamicCtaTemplate
 
 # Set seaborn style
 sns.set_style("whitegrid")
@@ -285,7 +285,8 @@ class BacktestingEngine:
             self.datetime = data.datetime
 
             try:
-                self.callback(data)
+                bars = {self.vt_symbol: data}
+                self.callback(bars)
             except Exception:
                 self.output("触发异常，回测终止")
                 self.output(traceback.format_exc())
@@ -755,7 +756,8 @@ class BacktestingEngine:
 
         self.cross_limit_order()
         self.cross_stop_order()
-        self.strategy.on_bar(bar)
+        bars = {self.vt_symbol: bar}
+        self.strategy.on_bars(bars)
 
         self.update_daily_close(bar.close_price)
 
@@ -766,7 +768,8 @@ class BacktestingEngine:
 
         self.cross_limit_order()
         self.cross_stop_order()
-        self.strategy.on_tick(tick)
+        ticks = {ga_vt_symbol: tick}
+        self.strategy.on_ticks(ticks)
 
         self.update_daily_close(tick.last_price)
 
@@ -949,7 +952,7 @@ class BacktestingEngine:
     def send_order(
         self,
         vt_symbol: str,
-        strategy: CtaTemplate,
+        strategy: DynamicCtaTemplate,
         direction: Direction,
         offset: Offset,
         price: float,
@@ -1020,7 +1023,7 @@ class BacktestingEngine:
 
         return order.vt_orderid
 
-    def cancel_order(self, strategy: CtaTemplate, vt_orderid: str):
+    def cancel_order(self, strategy: DynamicCtaTemplate, vt_orderid: str):
         """
         Cancel order by vt_orderid.
         """
@@ -1029,7 +1032,7 @@ class BacktestingEngine:
         else:
             self.cancel_limit_order(strategy, vt_orderid)
 
-    def cancel_stop_order(self, strategy: CtaTemplate, vt_orderid: str):
+    def cancel_stop_order(self, strategy: DynamicCtaTemplate, vt_orderid: str):
         """"""
         if vt_orderid not in self.active_stop_orders:
             return
@@ -1038,7 +1041,7 @@ class BacktestingEngine:
         stop_order.status = StopOrderStatus.CANCELLED
         self.strategy.on_stop_order(stop_order)
 
-    def cancel_limit_order(self, strategy: CtaTemplate, vt_orderid: str):
+    def cancel_limit_order(self, strategy: DynamicCtaTemplate, vt_orderid: str):
         """"""
         if vt_orderid not in self.active_limit_orders:
             return
@@ -1047,7 +1050,7 @@ class BacktestingEngine:
         order.status = Status.CANCELLED
         self.strategy.on_order(order)
 
-    def cancel_all(self, strategy: CtaTemplate):
+    def cancel_all(self, strategy: DynamicCtaTemplate):
         """
         Cancel all orders, both limit and stop.
         """
@@ -1059,20 +1062,20 @@ class BacktestingEngine:
         for vt_orderid in stop_orderids:
             self.cancel_stop_order(strategy, vt_orderid)
 
-    def write_log(self, msg: str, strategy: CtaTemplate = None):
+    def write_log(self, msg: str, strategy: DynamicCtaTemplate = None):
         """
         Write log message.
         """
         msg = f"{self.datetime}\t{msg}"
         self.logs.append(msg)
 
-    def send_email(self, msg: str, strategy: CtaTemplate = None):
+    def send_email(self, msg: str, strategy: DynamicCtaTemplate = None):
         """
         Send email to default receiver.
         """
         pass
 
-    def sync_strategy_data(self, strategy: CtaTemplate):
+    def sync_strategy_data(self, strategy: DynamicCtaTemplate):
         """
         Sync strategy data into json file.
         """
@@ -1084,13 +1087,13 @@ class BacktestingEngine:
         """
         return self.engine_type
 
-    def get_pricetick(self, strategy: CtaTemplate):
+    def get_pricetick(self, strategy: DynamicCtaTemplate):
         """
         Return contract pricetick data.
         """
         return self.pricetick
 
-    def put_strategy_event(self, strategy: CtaTemplate):
+    def put_strategy_event(self, strategy: DynamicCtaTemplate):
         """
         Put an event to update strategy status.
         """
@@ -1211,7 +1214,7 @@ class DailyResult:
 
 def optimize(
     target_name: str,
-    strategy_class: CtaTemplate,
+    strategy_class: DynamicCtaTemplate,
     setting: dict,
     vt_symbol: str,
     interval: Interval,

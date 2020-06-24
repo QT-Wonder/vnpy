@@ -1,5 +1,5 @@
 from vnpy.app.dynamic_cta_strategy import (
-    CtaTemplate,
+    DynamicCtaTemplate,
     StopOrder,
     TickData,
     BarData,
@@ -9,7 +9,7 @@ from vnpy.app.dynamic_cta_strategy import (
     ArrayManager,
 )
 
-
+from typing import Dict
 import csv
 from datetime import datetime
 import jqdatasdk as jq
@@ -17,7 +17,7 @@ import pandas as pd
 from vnpy.trader.setting import SETTINGS
 from vnpy.app.dynamic_cta_strategy.base import BacktestingMode
 
-class DemoStrategy(CtaTemplate):
+class DemoStrategy(DynamicCtaTemplate):
     author = "QT-WOnder"
 
     underlying_symbol = 'IC'
@@ -84,7 +84,7 @@ class DemoStrategy(CtaTemplate):
 
         self.put_event()
 
-    def on_tick(self, tick: TickData):
+    def on_ticks(self, ticks: Dict[str, TickData]):
         """
         Callback of new tick data update.
         """

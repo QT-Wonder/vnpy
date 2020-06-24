@@ -1,7 +1,7 @@
 """"""
 from abc import ABC
 from copy import copy
-from typing import Any, Callable
+from typing import Any, Callable, Dict, Set, List, TYPE_CHECKING
 
 from vnpy.trader.constant import Interval, Direction, Offset
 from vnpy.trader.object import BarData, TickData, OrderData, TradeData
@@ -11,7 +11,7 @@ from .base import StopOrder, EngineType
 from vnpy.app.dynamic_cta_strategy.base import BacktestingMode
 
 
-class CtaTemplate(ABC):
+class DynamicCtaTemplate(ABC):
     """"""
 
     author = ""
@@ -115,14 +115,14 @@ class CtaTemplate(ABC):
         pass
 
     @virtual
-    def on_tick(self, tick: TickData):
+    def on_ticks(self, ticks: Dict[str, TickData]):
         """
         Callback of new tick data update.
         """
         pass
 
     @virtual
-    def on_bar(self, bar: BarData):
+    def on_bars(self, bars: Dict[str, BarData]) -> None:
         """
         Callback of new bar data update.
         """
@@ -237,7 +237,7 @@ class CtaTemplate(ABC):
         Load historical bar data for initializing strategy.
         """
         if not callback:
-            callback = self.on_bar
+            callback = self.on_bars
 
         self.cta_engine.load_bar(
             self.vt_symbol,
@@ -305,7 +305,7 @@ class CtaSignal(ABC):
         return self.signal_pos
 
 
-class TargetPosTemplate(CtaTemplate):
+class TargetPosTemplate(DynamicCtaTemplate):
     """"""
     tick_add = 1
 

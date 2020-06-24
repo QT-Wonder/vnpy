@@ -13,7 +13,7 @@ from vnpy.trader.utility import extract_vt_symbol
 from vnpy.trader.object import HistoryRequest
 from vnpy.trader.mddata import mddata_client
 from vnpy.trader.database import database_manager
-from vnpy.app.dynamic_cta_strategy import CtaTemplate
+from vnpy.app.dynamic_cta_strategy import DynamicCtaTemplate
 from vnpy.app.dynamic_cta_strategy.backtesting import BacktestingEngine, OptimizationSetting
 from vnpy.app.dynamic_cta_strategy.base import BacktestingMode
 
@@ -110,7 +110,7 @@ class QTWonderBacktesterEngine(BaseEngine):
 
             for name in dir(module):
                 value = getattr(module, name)
-                if (isinstance(value, type) and issubclass(value, CtaTemplate) and value is not CtaTemplate):
+                if (isinstance(value, type) and issubclass(value, DynamicCtaTemplate) and value is not DynamicCtaTemplate):
                     self.classes[value.__name__] = value
         except:  # noqa
             msg = f"策略文件{module_name}加载失败，触发异常：\n{traceback.format_exc()}"

@@ -1,5 +1,6 @@
+from typing import Dict
 from vnpy.app.dynamic_cta_strategy import (
-    CtaTemplate,
+    DynamicCtaTemplate,
     StopOrder,
     TickData,
     BarData,
@@ -11,7 +12,7 @@ from vnpy.app.dynamic_cta_strategy import (
 from vnpy.app.dynamic_cta_strategy.base import BacktestingMode
 
 
-class AtrRsiStrategy(CtaTemplate):
+class AtrRsiStrategy(DynamicCtaTemplate):
     """"""
 
     author = "用Python的交易员"
@@ -52,7 +53,7 @@ class AtrRsiStrategy(CtaTemplate):
     def __init__(self, cta_engine, strategy_name, vt_symbol, setting):
         """"""
         super().__init__(cta_engine, strategy_name, vt_symbol, setting)
-        self.bg = BarGenerator(self.on_bar)
+        # self.bg = BarGenerator(self.on_bar)
         self.am = ArrayManager()
 
     def on_init(self, mode: BacktestingMode):
@@ -82,17 +83,19 @@ class AtrRsiStrategy(CtaTemplate):
         """
         self.write_log("策略停止")
 
-    def on_tick(self, tick: TickData):
+    def on_ticks(self, ticks: Dict[str, TickData]):
         """
         Callback of new tick data update.
         """
-        self.bg.update_tick(tick)
+        # self.bg.update_tick(tick)
 
-    def on_bar(self, bar: BarData):
+    def on_bars(self, bars: Dict[str, BarData]):
         """
         Callback of new bar data update.
         """
         self.cancel_all()
+
+        bar = bars[self.vt_symbol]
 
         am = self.am
         am.update_bar(bar)

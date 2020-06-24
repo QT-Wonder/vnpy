@@ -51,7 +51,7 @@ from .base import (
     StopOrderStatus,
     STOPORDER_PREFIX
 )
-from .template import CtaTemplate
+from .template import DynamicCtaTemplate
 
 
 STOP_STATUS_MAP = {
@@ -290,7 +290,7 @@ class CtaEngine(BaseEngine):
 
     def send_server_order(
         self,
-        strategy: CtaTemplate,
+        strategy: DynamicCtaTemplate,
         contract: ContractData,
         direction: Direction,
         offset: Offset,
@@ -341,7 +341,7 @@ class CtaEngine(BaseEngine):
 
     def send_limit_order(
         self,
-        strategy: CtaTemplate,
+        strategy: DynamicCtaTemplate,
         contract: ContractData,
         direction: Direction,
         offset: Offset,
@@ -365,7 +365,7 @@ class CtaEngine(BaseEngine):
 
     def send_server_stop_order(
         self,
-        strategy: CtaTemplate,
+        strategy: DynamicCtaTemplate,
         contract: ContractData,
         direction: Direction,
         offset: Offset,
@@ -392,7 +392,7 @@ class CtaEngine(BaseEngine):
 
     def send_local_stop_order(
         self,
-        strategy: CtaTemplate,
+        strategy: DynamicCtaTemplate,
         direction: Direction,
         offset: Offset,
         price: float,
@@ -426,7 +426,7 @@ class CtaEngine(BaseEngine):
 
         return [stop_orderid]
 
-    def cancel_server_order(self, strategy: CtaTemplate, vt_orderid: str):
+    def cancel_server_order(self, strategy: DynamicCtaTemplate, vt_orderid: str):
         """
         Cancel existing order by vt_orderid.
         """
@@ -438,7 +438,7 @@ class CtaEngine(BaseEngine):
         req = order.create_cancel_request()
         self.main_engine.cancel_order(req, order.gateway_name)
 
-    def cancel_local_stop_order(self, strategy: CtaTemplate, stop_orderid: str):
+    def cancel_local_stop_order(self, strategy: DynamicCtaTemplate, stop_orderid: str):
         """
         Cancel a local stop order.
         """
@@ -462,7 +462,7 @@ class CtaEngine(BaseEngine):
 
     def send_order(
         self,
-        strategy: CtaTemplate,
+        strategy: DynamicCtaTemplate,
         vt_symbol: str,
         direction: Direction,
         offset: Offset,
@@ -490,7 +490,7 @@ class CtaEngine(BaseEngine):
         else:
             return self.send_limit_order(strategy, contract, direction, offset, price, volume, lock)
 
-    def cancel_order(self, strategy: CtaTemplate, vt_orderid: str):
+    def cancel_order(self, strategy: DynamicCtaTemplate, vt_orderid: str):
         """
         """
         if vt_orderid.startswith(STOPORDER_PREFIX):
@@ -498,7 +498,7 @@ class CtaEngine(BaseEngine):
         else:
             self.cancel_server_order(strategy, vt_orderid)
 
-    def cancel_all(self, strategy: CtaTemplate):
+    def cancel_all(self, strategy: DynamicCtaTemplate):
         """
         Cancel all active orders of a strategy.
         """
@@ -513,7 +513,7 @@ class CtaEngine(BaseEngine):
         """"""
         return self.engine_type
 
-    def get_pricetick(self, strategy: CtaTemplate):
+    def get_pricetick(self, strategy: DynamicCtaTemplate):
         """
         Return contract pricetick data.
         """
@@ -591,7 +591,7 @@ class CtaEngine(BaseEngine):
             callback(tick)
 
     def call_strategy_func(
-        self, strategy: CtaTemplate, func: Callable, params: Any = None
+        self, strategy: DynamicCtaTemplate, func: Callable, params: Any = None
     ):
         """
         Call function of a strategy and catch any exception raised.
@@ -789,7 +789,7 @@ class CtaEngine(BaseEngine):
 
             for name in dir(module):
                 value = getattr(module, name)
-                if (isinstance(value, type) and issubclass(value, CtaTemplate) and value is not CtaTemplate):
+                if (isinstance(value, type) and issubclass(value, DynamicCtaTemplate) and value is not DynamicCtaTemplate):
                     self.classes[value.__name__] = value
         except:  # noqa
             msg = f"策略文件{module_name}加载失败，触发异常：\n{traceback.format_exc()}"
@@ -801,7 +801,7 @@ class CtaEngine(BaseEngine):
         """
         self.strategy_data = load_json(self.data_filename)
 
-    def sync_strategy_data(self, strategy: CtaTemplate):
+    def sync_strategy_data(self, strategy: DynamicCtaTemplate):
         """
         Sync strategy data into json file.
         """
@@ -899,7 +899,7 @@ class CtaEngine(BaseEngine):
         event = Event(EVENT_CTA_STOPORDER, stop_order)
         self.event_engine.put(event)
 
-    def put_strategy_event(self, strategy: CtaTemplate):
+    def put_strategy_event(self, strategy: DynamicCtaTemplate):
         """
         Put an event to update strategy status.
         """
@@ -907,7 +907,7 @@ class CtaEngine(BaseEngine):
         event = Event(EVENT_CTA_STRATEGY, data)
         self.event_engine.put(event)
 
-    def write_log(self, msg: str, strategy: CtaTemplate = None):
+    def write_log(self, msg: str, strategy: DynamicCtaTemplate = None):
         """
         Create cta engine log event.
         """
@@ -918,7 +918,7 @@ class CtaEngine(BaseEngine):
         event = Event(type=EVENT_CTA_LOG, data=log)
         self.event_engine.put(event)
 
-    def send_email(self, msg: str, strategy: CtaTemplate = None):
+    def send_email(self, msg: str, strategy: DynamicCtaTemplate = None):
         """
         Send email to default receiver.
         """

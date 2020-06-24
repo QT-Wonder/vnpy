@@ -13,9 +13,9 @@ from vnpy.trader.utility import extract_vt_symbol
 from vnpy.trader.object import HistoryRequest
 from vnpy.trader.mddata import mddata_client
 from vnpy.trader.database import database_manager
-from vnpy.app.cta_strategy import CtaTemplate
-from vnpy.app.cta_strategy.backtesting import BacktestingEngine, OptimizationSetting
-from vnpy.app.cta_strategy.base import BacktestingMode
+from vnpy.app.dynamic_cta_strategy import DynamicCtaTemplate
+from vnpy.app.dynamic_cta_strategy.backtesting import BacktestingEngine, OptimizationSetting
+from vnpy.app.dynamic_cta_strategy.base import BacktestingMode
 
 APP_NAME = "QTWonderBacktester"
 
@@ -76,9 +76,9 @@ class QTWonderBacktesterEngine(BaseEngine):
         Load strategy class from source code.
         """
         app_path = Path(__file__).parent.parent
-        path1 = app_path.joinpath("cta_strategy", "strategies")
+        path1 = app_path.joinpath("dynamic_cta_strategy", "strategies")
         self.load_strategy_class_from_folder(
-            path1, "vnpy.app.cta_strategy.strategies")
+            path1, "vnpy.app.dynamic_cta_strategy.strategies")
 
         path2 = Path.cwd().joinpath("strategies")
         self.load_strategy_class_from_folder(path2, "strategies")
@@ -110,7 +110,7 @@ class QTWonderBacktesterEngine(BaseEngine):
 
             for name in dir(module):
                 value = getattr(module, name)
-                if (isinstance(value, type) and issubclass(value, CtaTemplate) and value is not CtaTemplate):
+                if (isinstance(value, type) and issubclass(value, DynamicCtaTemplate) and value is not DynamicCtaTemplate):
                     self.classes[value.__name__] = value
         except:  # noqa
             msg = f"策略文件{module_name}加载失败，触发异常：\n{traceback.format_exc()}"

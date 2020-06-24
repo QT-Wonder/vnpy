@@ -1,3 +1,6 @@
+import csv
+import os
+
 from typing import Tuple, Dict
 from functools import partial
 from datetime import datetime, timedelta
@@ -5,9 +8,13 @@ from tzlocal import get_localzone
 
 from vnpy.trader.ui import QtWidgets, QtCore
 from vnpy.trader.engine import MainEngine, EventEngine
+from vnpy.trader.object import TickData
 from vnpy.trader.constant import Interval, Exchange
+from vnpy.trader.database import database_manager
 
 from ..engine import APP_NAME, TickManagerEngine
+
+import pandas as pd
 
 
 class TickManagerWidget(QtWidgets.QWidget):
@@ -198,34 +205,104 @@ class TickManagerWidget(QtWidgets.QWidget):
         ask_volume_1_head = dialog.ask_volume_1_edit.text()
         datetime_format = dialog.format_edit.text()
 
-        start, end, count = self.engine.import_data_from_csv(
-            file_path,
-            symbol,
-            exchange,
-            datetime_head,            
-            open_head,
-            high_head,
-            low_head,
-            close_head,
-            volume_head,
-            lastprice_head,
-            open_interest_head,
-            bid_price_1_head,
-            bid_volume_1_head,
-            ask_price_1_head,
-            ask_volume_1_head,
-            datetime_format
-        )
+        file_count = 0
+        start = None
+        end = None
+        count_t = 0
+        stop_flag = None
+        for file in os.listdir(file_path):
+            if not file.endswith(".csv"):
+                continue
+            file_count += 1
+        # 读取总行数（不多于1000万行数据）
+            total = 0
+            user_info=pd.read_csv(os.path.join(file_path, file), iterator=True)
+            for i in range(1000):
+                try:
+                    user = user_info.get_chunk(10000)
+                    total += user.shape[0]
+                except StopIteration:
+                    break
 
-        msg = f"\
+
+            # 生成进度窗口
+            dialog2 = QtWidgets.QProgressDialog(
+                f"正在读取第{file_count}个文档，共{total}条，读取结束后将会被写入数据库...",
+                "取消",
+                0,
+                100
+            )
+            dialog2.setWindowTitle("数据读取进度")
+            dialog2.setWindowModality(QtCore.Qt.WindowModal)
+            dialog2.setValue(0)
+
+
+            with open(os.path.join(file_path, file), "rt") as f:
+                buf = [line.replace("\0", "") for line in f]
+
+            reader = csv.DictReader(buf, delimiter=",")
+
+            ticks = []
+            count = 0
+            
+            for item in reader:
+                if(dialog2.wasCanceled()):
+                    stop_flag = True
+                if stop_flag:
+                    break
+                open_interest = item.get(open_interest_head, 0)
+            # 通用时间格式
+                dt = datetime.strptime(str(pd.to_datetime(item[datetime_head]).strftime('%Y-%m-%d %H:%M:%S.%f')), '%Y-%m-%d %H:%M:%S.%f')
+                tick = TickData(
+                    symbol=symbol,
+                    exchange=exchange,
+                    datetime=dt,
+                    volume=item[volume_head],
+                    last_price=item[lastprice_head],                
+                    open_price=item[open_head],
+                    high_price=item[high_head],
+                    low_price=item[low_head],
+                    pre_close=item[close_head],
+                    open_interest=open_interest,
+                    bid_price_1=item[bid_price_1_head],
+                    bid_volume_1=item[bid_volume_1_head],
+                    ask_price_1=item[ask_price_1_head],
+                    ask_volume_1=item[ask_volume_1_head],
+                    gateway_name="DB",
+                )
+                ticks.append(tick)                
+                
+            # do some statistics
+                count += 1
+                count_t +=1
+                if not start:
+                    start = tick.datetime
+            # 系数*100时，窗口会闪，暂时设置为*99
+                progress = int(round(count / total * 99, 0))                
+                dialog2.setValue(progress)
+            if stop_flag:
+                break
+            
+            # insert into database
+            database_manager.save_tick_data(ticks)
+            end = tick.datetime
+            dialog2.close() 
+
+        msg1 = f"\
         CSV载入成功\n\
+        载入文件个数:{file_count}\n\
         代码：{symbol}\n\
         交易所：{exchange.value}\n\
         起始：{start}\n\
         结束：{end}\n\
-        总数量：{count}\n\
-        "
-        QtWidgets.QMessageBox.information(self, "载入成功！", msg)
+        总数量：{count_t}\n\
+            "
+        msg2 = f"数据读取已取消，加载中断"
+        
+        if stop_flag:
+            QtWidgets.QMessageBox.information(self, "载入失败！", msg2)
+        else:
+            QtWidgets.QMessageBox.information(self, "载入成功！", msg1)
     
     def output_data(
         self,
@@ -444,8 +521,10 @@ class ImportDialog(QtWidgets.QDialog):
             (self.windowFlags() | QtCore.Qt.CustomizeWindowHint)
             & ~QtCore.Qt.WindowMaximizeButtonHint)
 
-        file_button = QtWidgets.QPushButton("选择文件")
-        file_button.clicked.connect(self.select_file)
+        # file_button = QtWidgets.QPushButton("选择文件")
+        # file_button.clicked.connect(self.select_file)
+        file_button = QtWidgets.QPushButton("选择路径")
+        file_button.clicked.connect(self.select_path)
 
         load_button = QtWidgets.QPushButton("确定")
         load_button.clicked.connect(self.accept)
@@ -516,6 +595,13 @@ class ImportDialog(QtWidgets.QDialog):
         filename = result[0]
         if filename:
             self.file_edit.setText(filename)
+    
+    def select_path(self):
+        """"""
+        result: str = QtWidgets.QFileDialog.getExistingDirectory(self)
+        filepath = result
+        if filepath:
+            self.file_edit.setText(filepath)
 
 # Download is still for bar data not change for tick data yet
 class DownloadDialog(QtWidgets.QDialog):

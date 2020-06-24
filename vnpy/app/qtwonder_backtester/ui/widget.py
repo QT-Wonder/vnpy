@@ -21,7 +21,7 @@ from ..engine import (
     EVENT_BACKTESTER_OPTIMIZATION_FINISHED,
     OptimizationSetting
 )
-from vnpy.app.cta_strategy.base import BacktestingMode
+from vnpy.app.dynamic_cta_strategy.base import BacktestingMode
 
 
 class QTWonderBacktesterManager(QtWidgets.QWidget):
@@ -68,7 +68,7 @@ class QTWonderBacktesterManager(QtWidgets.QWidget):
 
     def init_ui(self):
         """"""
-        self.setWindowTitle("CTA回测")
+        self.setWindowTitle("动态CTA回测")
 
         # Setting Part
         self.class_combo = QtWidgets.QComboBox()

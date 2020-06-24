@@ -1,5 +1,6 @@
 import csv
 import os
+import re
 
 from typing import Tuple, Dict
 from functools import partial
@@ -41,8 +42,11 @@ class TickManagerWidget(QtWidgets.QWidget):
         refresh_button = QtWidgets.QPushButton("刷新")
         refresh_button.clicked.connect(self.refresh_tree)        
 
-        import_button = QtWidgets.QPushButton("导入tick数据")
+        import_button = QtWidgets.QPushButton("从文件导入tick数据")
         import_button.clicked.connect(self.import_data)
+
+        import_folder_button = QtWidgets.QPushButton("从文件夹导入tick数据")
+        import_folder_button.clicked.connect(self.import_data_from_folder)
 
         update_button = QtWidgets.QPushButton("更新tick数据")
         update_button.clicked.connect(self.update_data)
@@ -54,6 +58,7 @@ class TickManagerWidget(QtWidgets.QWidget):
         hbox1.addWidget(refresh_button)
         hbox1.addStretch()        
         hbox1.addWidget(import_button)
+        hbox1.addWidget(import_folder_button)
         hbox1.addWidget(update_button)
         hbox1.addWidget(download_button)
 
@@ -183,7 +188,136 @@ class TickManagerWidget(QtWidgets.QWidget):
 
     def import_data(self) -> None:
         """"""
-        dialog = ImportDialog()
+        msginit = f"即将从.csv文件导入数据...\n注意：命名格式应为\"Symbol.Exchange.***.csv\"！"
+        QtWidgets.QMessageBox.information(self, "从文件导入数据", msginit)
+
+        dialog = ImportDialog(isfromfolder=False)
+        n = dialog.exec_()
+        if n != dialog.Accepted:
+            return
+
+        file_path = dialog.file_edit.text()
+        symbol = dialog.symbol_edit.text()
+        exchange = dialog.exchange_combo.currentData()
+        datetime_head = dialog.datetime_edit.text()        
+        open_head = dialog.open_edit.text()
+        low_head = dialog.low_edit.text()
+        high_head = dialog.high_edit.text()
+        close_head = dialog.close_edit.text()
+        volume_head = dialog.volume_edit.text()
+        lastprice_head =  dialog.last_price_edit.text()
+        open_interest_head = dialog.open_interest_edit.text()
+        bid_price_1_head = dialog.bid_price_1_edit.text()
+        bid_volume_1_head = dialog.bid_volume_1_edit.text()
+        ask_price_1_head = dialog.ask_price_1_edit.text()
+        ask_volume_1_head = dialog.ask_volume_1_edit.text()
+        datetime_format = dialog.format_edit.text()
+
+        # 从文件名读取代码和交易所
+        (filep, filen) = os.path.split(file_path)
+        if not re.match("(\w+).(\w+)", filen):
+            msginit = f"数据读取失败,请确认文件名称格式为\n\"代码.交易所.***.csv\""
+            QtWidgets.QMessageBox.information(self, "导入出错", msginit)
+            return
+        (sym,exc)=re.match("(\w+).(\w+)", filen).group(1,2)
+        if exc in Exchange.__members__ :
+            exchange = Exchange(exc)
+            symbol = sym
+        else :
+            msginit = f"数据识别为交易所{exc}的{sym},交易所不在列表中,请核对后重试"
+            QtWidgets.QMessageBox.information(self, "导入出错", msginit)
+            return
+
+        # 读取总行数（不多于1000万行数据）
+        total = 0
+        user_info=pd.read_csv(file_path, iterator=True)
+        for i in range(1000):
+            try:
+                user = user_info.get_chunk(10000)
+                total += user.shape[0]
+            except StopIteration:
+                break
+
+
+        # 生成进度窗口
+        dialog2 = QtWidgets.QProgressDialog(
+            "数据读取中,请稍等,共"+str(total)+"条\n读取结束后将会被写入数据库,请稍等...",
+            "取消",
+            0,
+            100
+        )
+        dialog2.setWindowTitle("数据读取进度")
+        dialog2.setWindowModality(QtCore.Qt.WindowModal)
+        dialog2.setValue(0)
+
+
+        with open(file_path, "rt") as f:
+            buf = [line.replace("\0", "") for line in f]
+
+        reader = csv.DictReader(buf, delimiter=",")
+
+        ticks = []
+        start = None
+        count = 0
+        stop_flag = False
+        for item in reader:
+            if(dialog2.wasCanceled()):
+                stop_flag = True
+                break
+            open_interest = item.get(open_interest_head, 0)
+        # 通用时间格式
+            dt = datetime.strptime(str(pd.to_datetime(item[datetime_head]).strftime('%Y-%m-%d %H:%M:%S.%f')), '%Y-%m-%d %H:%M:%S.%f')
+            tick = TickData(
+                symbol=symbol,
+                exchange=exchange,
+                datetime=dt,
+                volume=item[volume_head],
+                last_price=item[lastprice_head],                
+                open_price=item[open_head],
+                high_price=item[high_head],
+                low_price=item[low_head],
+                pre_close=item[close_head],
+                open_interest=open_interest,
+                bid_price_1=item[bid_price_1_head],
+                bid_volume_1=item[bid_volume_1_head],
+                ask_price_1=item[ask_price_1_head],
+                ask_volume_1=item[ask_volume_1_head],
+                gateway_name="DB",
+            )
+            ticks.append(tick)                
+            
+        # do some statistics
+            count += 1
+            if not start:
+                start = tick.datetime
+        # 系数*100时，窗口会闪，暂时设置为*99
+            progress = int(round(count / total * 99, 0))                
+            dialog2.setValue(progress)
+        # insert into database
+        if not stop_flag:
+            database_manager.save_tick_data(ticks)
+        end = tick.datetime
+        dialog2.close() 
+
+        msg = f"\
+        CSV载入成功\n\
+        代码：{symbol}\n\
+        交易所：{exchange.value}\n\
+        起始：{start}\n\
+        结束：{end}\n\
+        总数量：{count}\n\
+        "
+        msg2 = f"数据读取已取消，加载中断"
+        if stop_flag:
+            QtWidgets.QMessageBox.information(self, "载入失败！", msg2)
+        else:
+            QtWidgets.QMessageBox.information(self, "载入成功！", msg)
+
+    def import_data_from_folder(self) -> None:
+        """"""
+        msginit = f"即将从文件夹中搜索所有.csv文件导入数据库，请注意文件命名格式应为\"Symbol.Exchange.***.csv\"！"
+        QtWidgets.QMessageBox.information(self, "从文件夹导入数据", msginit)
+        dialog = ImportDialog(isfromfolder=True)
         n = dialog.exec_()
         if n != dialog.Accepted:
             return
@@ -209,13 +343,29 @@ class TickManagerWidget(QtWidgets.QWidget):
         start = None
         end = None
         count_t = 0
+        fail_count = 0
         stop_flag = None
         for file in os.listdir(file_path):
             if not file.endswith(".csv"):
                 continue
-            file_count += 1
+            # 从文件名读取代码和交易所
+            if not re.match("(\w+).(\w+)", file):
+                msginit = f"读取文件{file}失败,无法识别文件名称,请将文件命名为\"代码.交易所***.csv\""
+                QtWidgets.QMessageBox.information(self, "导入出错", msginit)
+                fail_count +=1
+                continue
+            (sym,exc)=re.match("(\w+).(\w+)", file).group(1,2)
+            if exc in Exchange.__members__ :
+                exchange = Exchange(exc)
+                symbol = sym
+            else :
+                msginit = f"文件{file}被识别为交易所{exc}的{sym}数据,交易所不在列表中,请核对后导入"
+                QtWidgets.QMessageBox.information(self, "导入出错", msginit)
+                fail_count +=1
+                continue
         # 读取总行数（不多于1000万行数据）
             total = 0
+            file_count += 1
             user_info=pd.read_csv(os.path.join(file_path, file), iterator=True)
             for i in range(1000):
                 try:
@@ -227,7 +377,7 @@ class TickManagerWidget(QtWidgets.QWidget):
 
             # 生成进度窗口
             dialog2 = QtWidgets.QProgressDialog(
-                f"正在读取第{file_count}个文档，共{total}条，读取结束后将会被写入数据库...",
+                f"[读取文件{file_count}]{file}数据量：{total}条\n读取结束后将会被写入数据库,请稍等...",
                 "取消",
                 0,
                 100
@@ -290,17 +440,17 @@ class TickManagerWidget(QtWidgets.QWidget):
 
         msg1 = f"\
         CSV载入成功\n\
-        载入文件个数:{file_count}\n\
-        代码：{symbol}\n\
-        交易所：{exchange.value}\n\
-        起始：{start}\n\
-        结束：{end}\n\
+        载入文件:{file_count}\n\
+        失败文件:{fail_count}\n\
         总数量：{count_t}\n\
             "
-        msg2 = f"数据读取已取消，加载中断"
-        
-        if stop_flag:
-            QtWidgets.QMessageBox.information(self, "载入失败！", msg2)
+        msg2 = f"数据读取已取消,加载中断,已成功读取文件:{file_count-1}"
+        msg3 = f"无加载数据"
+
+        if stop_flag :
+            QtWidgets.QMessageBox.information(self, "载入取消！", msg2)
+        elif  count_t == 0:
+            QtWidgets.QMessageBox.information(self, "载入失败！", msg3)
         else:
             QtWidgets.QMessageBox.information(self, "载入成功！", msg1)
     
@@ -510,7 +660,7 @@ class DateRangeDialog(QtWidgets.QDialog):
 class ImportDialog(QtWidgets.QDialog):
     """"""
     # 扩展为对tick数据的支持
-    def __init__(self, parent=None):
+    def __init__(self, isfromfolder, parent=None):
         """"""
         super().__init__()
 
@@ -520,17 +670,18 @@ class ImportDialog(QtWidgets.QDialog):
         self.setWindowFlags(
             (self.windowFlags() | QtCore.Qt.CustomizeWindowHint)
             & ~QtCore.Qt.WindowMaximizeButtonHint)
-
-        # file_button = QtWidgets.QPushButton("选择文件")
-        # file_button.clicked.connect(self.select_file)
-        file_button = QtWidgets.QPushButton("选择路径")
-        file_button.clicked.connect(self.select_path)
+        if isfromfolder:
+            file_button = QtWidgets.QPushButton("选择路径")
+            file_button.clicked.connect(self.select_path)
+        else:
+            file_button = QtWidgets.QPushButton("选择文件")
+            file_button.clicked.connect(self.select_file)
 
         load_button = QtWidgets.QPushButton("确定")
         load_button.clicked.connect(self.accept)
 
         self.file_edit = QtWidgets.QLineEdit()
-        self.symbol_edit = QtWidgets.QLineEdit()
+        self.symbol_edit = QtWidgets.QLineEdit("文件名识别")
 
         self.exchange_combo = QtWidgets.QComboBox()
         for i in Exchange:
@@ -564,8 +715,8 @@ class ImportDialog(QtWidgets.QDialog):
         form.addRow(file_button, self.file_edit)
         form.addRow(QtWidgets.QLabel())
         form.addRow(info_label)
-        form.addRow("代码", self.symbol_edit)
-        form.addRow("交易所", self.exchange_combo)        
+        form.addRow("代码*", self.symbol_edit)
+        form.addRow("交易所*", self.exchange_combo)        
         form.addRow(QtWidgets.QLabel())
         form.addRow(head_label)
         form.addRow("时间戳", self.datetime_edit)        

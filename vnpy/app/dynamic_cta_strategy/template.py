@@ -149,32 +149,33 @@ class CtaTemplate(ABC):
         """
         pass
 
-    def buy(self, price: float, volume: float, stop: bool = False, lock: bool = False):
+    def buy(self, vt_symbol: str, price: float, volume: float, stop: bool = False, lock: bool = False):
         """
         Send buy order to open a long position.
         """
-        return self.send_order(Direction.LONG, Offset.OPEN, price, volume, stop, lock)
+        return self.send_order(vt_symbol, Direction.LONG, Offset.OPEN, price, volume, stop, lock)
 
-    def sell(self, price: float, volume: float, stop: bool = False, lock: bool = False):
+    def sell(self, vt_symbol: str, price: float, volume: float, stop: bool = False, lock: bool = False):
         """
         Send sell order to close a long position.
         """
-        return self.send_order(Direction.SHORT, Offset.CLOSE, price, volume, stop, lock)
+        return self.send_order(vt_symbol, Direction.SHORT, Offset.CLOSE, price, volume, stop, lock)
 
-    def short(self, price: float, volume: float, stop: bool = False, lock: bool = False):
+    def short(self, vt_symbol: str, price: float, volume: float, stop: bool = False, lock: bool = False):
         """
         Send short order to open as short position.
         """
-        return self.send_order(Direction.SHORT, Offset.OPEN, price, volume, stop, lock)
+        return self.send_order(vt_symbol, Direction.SHORT, Offset.OPEN, price, volume, stop, lock)
 
-    def cover(self, price: float, volume: float, stop: bool = False, lock: bool = False):
+    def cover(self, vt_symbol: str, price: float, volume: float, stop: bool = False, lock: bool = False):
         """
         Send cover order to close a short position.
         """
-        return self.send_order(Direction.LONG, Offset.CLOSE, price, volume, stop, lock)
+        return self.send_order(vt_symbol, Direction.LONG, Offset.CLOSE, price, volume, stop, lock)
 
     def send_order(
         self,
+        vt_symbol: str,
         direction: Direction,
         offset: Offset,
         price: float,
@@ -187,7 +188,7 @@ class CtaTemplate(ABC):
         """
         if self.trading:
             vt_orderids = self.cta_engine.send_order(
-                self, direction, offset, price, volume, stop, lock
+                self, vt_symbol, direction, offset, price, volume, stop, lock
             )
             return vt_orderids
         else:

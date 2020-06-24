@@ -948,6 +948,7 @@ class BacktestingEngine:
 
     def send_order(
         self,
+        vt_symbol: str,
         strategy: CtaTemplate,
         direction: Direction,
         offset: Offset,
@@ -959,13 +960,14 @@ class BacktestingEngine:
         """"""
         price = round_to(price, self.pricetick)
         if stop:
-            vt_orderid = self.send_stop_order(direction, offset, price, volume)
+            vt_orderid = self.send_stop_order(vt_symbol, direction, offset, price, volume)
         else:
-            vt_orderid = self.send_limit_order(direction, offset, price, volume)
+            vt_orderid = self.send_limit_order(vt_symbol, direction, offset, price, volume)
         return [vt_orderid]
 
     def send_stop_order(
         self,
+        vt_symbol: str,
         direction: Direction,
         offset: Offset,
         price: float,
@@ -975,7 +977,7 @@ class BacktestingEngine:
         self.stop_order_count += 1
 
         stop_order = StopOrder(
-            vt_symbol=self.vt_symbol,
+            vt_symbol=vt_symbol,
             direction=direction,
             offset=offset,
             price=price,
@@ -991,6 +993,7 @@ class BacktestingEngine:
 
     def send_limit_order(
         self,
+        vt_symbol: str,
         direction: Direction,
         offset: Offset,
         price: float,

@@ -463,6 +463,7 @@ class CtaEngine(BaseEngine):
     def send_order(
         self,
         strategy: CtaTemplate,
+        vt_symbol: str,
         direction: Direction,
         offset: Offset,
         price: float,
@@ -472,9 +473,9 @@ class CtaEngine(BaseEngine):
     ):
         """
         """
-        contract = self.main_engine.get_contract(strategy.vt_symbol)
+        contract = self.main_engine.get_contract(vt_symbol)
         if not contract:
-            self.write_log(f"委托失败，找不到合约：{strategy.vt_symbol}", strategy)
+            self.write_log(f"委托失败，找不到合约：{vt_symbol}", strategy)
             return ""
 
         # Round order price and volume to nearest incremental value

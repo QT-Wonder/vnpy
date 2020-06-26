@@ -50,10 +50,13 @@ class AtrRsiStrategy(DynamicCtaTemplate):
         "intra_trade_low"
     ]
 
-    def __init__(self, cta_engine, strategy_name, vt_symbol, setting):
+    def __init__(self, cta_engine, strategy_name, setting):
         """"""
-        super().__init__(cta_engine, strategy_name, vt_symbol, setting)
-        # self.bg = BarGenerator(self.on_bar)
+        super().__init__(cta_engine, strategy_name, setting)
+        def on_bar(bar: BarData):
+            """"""
+            pass
+        self.bg = BarGenerator(on_bar)
         self.am = ArrayManager()
 
     def on_init(self, mode: BacktestingMode):
@@ -65,10 +68,11 @@ class AtrRsiStrategy(DynamicCtaTemplate):
         self.rsi_buy = 50 + self.rsi_entry
         self.rsi_sell = 50 - self.rsi_entry
 
+        # TODO, need proper way to init
         if mode == BacktestingMode.TICK:
-            self.load_tick(1)
+            self.load_tick(1, 'IC2004.CFFEX')
         else:
-            self.load_bar(10)
+            self.load_bar(10, 'IC2004.CFFEX')
         
 
     def on_start(self):
@@ -83,19 +87,31 @@ class AtrRsiStrategy(DynamicCtaTemplate):
         """
         self.write_log("策略停止")
 
-    def on_ticks(self, ticks: Dict[str, TickData]):
+    def on_ticks(self, ticks):
         """
         Callback of new tick data update.
         """
-        # self.bg.update_tick(tick)
+        # TODO, only look at 1st month for now
+        if not ticks or not 0 in ticks:
+            return
+        symbol_tick = ticks[0]
+        vt_symbol = symbol_tick[0]
+        tick = symbol_tick[1]
+        self.bg.update_tick(tick)
+        # TODO, need proper way to call on_bars
 
-    def on_bars(self, bars: Dict[str, BarData]):
+    def on_bars(self, bars):
         """
         Callback of new bar data update.
         """
         self.cancel_all()
 
-        bar = bars[self.vt_symbol]
+        # TODO, only look at 1st month for now
+        if not bars or not 0 in bars:
+            return
+        symbol_bar = bars[0]
+        vt_symbol = symbol_bar[0]
+        bar = symbol_bar[1]
 
         am = self.am
         am.update_bar(bar)
@@ -113,9 +129,9 @@ class AtrRsiStrategy(DynamicCtaTemplate):
 
             if self.atr_value > self.atr_ma:
                 if self.rsi_value > self.rsi_buy:
-                    self.buy(self.vt_symbol, bar.close_price + 5, self.fixed_size)
+                    self.buy(vt_symbol, bar.close_price + 5, self.fixed_size)
                 elif self.rsi_value < self.rsi_sell:
-                    self.short(self.vt_symbol, bar.close_price - 5, self.fixed_size)
+                    self.short(vt_symbol, bar.close_price - 5, self.fixed_size)
 
         elif self.pos > 0:
             self.intra_trade_high = max(self.intra_trade_high, bar.high_price)
@@ -123,7 +139,7 @@ class AtrRsiStrategy(DynamicCtaTemplate):
 
             long_stop = self.intra_trade_high * \
                 (1 - self.trailing_percent / 100)
-            self.sell(self.vt_symbol, long_stop, abs(self.pos), stop=True)
+            self.sell(vt_symbol, long_stop, abs(self.pos), stop=True)
 
         elif self.pos < 0:
             self.intra_trade_low = min(self.intra_trade_low, bar.low_price)
@@ -131,7 +147,7 @@ class AtrRsiStrategy(DynamicCtaTemplate):
 
             short_stop = self.intra_trade_low * \
                 (1 + self.trailing_percent / 100)
-            self.cover(self.vt_symbol, short_stop, abs(self.pos), stop=True)
+            self.cover(vt_symbol, short_stop, abs(self.pos), stop=True)
 
         self.put_event()
 

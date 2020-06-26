@@ -22,13 +22,11 @@ class DynamicCtaTemplate(ABC):
         self,
         cta_engine: Any,
         strategy_name: str,
-        vt_symbol: str,
         setting: dict,
     ):
         """"""
         self.cta_engine = cta_engine
         self.strategy_name = strategy_name
-        self.vt_symbol = vt_symbol
 
         self.inited = False
         self.trading = False
@@ -85,7 +83,6 @@ class DynamicCtaTemplate(ABC):
         """
         strategy_data = {
             "strategy_name": self.strategy_name,
-            "vt_symbol": self.vt_symbol,
             "class_name": self.__class__.__name__,
             "author": self.author,
             "parameters": self.get_parameters(),
@@ -115,14 +112,14 @@ class DynamicCtaTemplate(ABC):
         pass
 
     @virtual
-    def on_ticks(self, ticks: Dict[str, TickData]):
+    def on_ticks(self, ticks):
         """
         Callback of new tick data update.
         """
         pass
 
     @virtual
-    def on_bars(self, bars: Dict[str, BarData]) -> None:
+    def on_bars(self, bars) -> None:
         """
         Callback of new bar data update.
         """
@@ -226,9 +223,11 @@ class DynamicCtaTemplate(ABC):
         """
         return self.cta_engine.get_pricetick(self)
 
+    # TODO, probably need change to load_bars
     def load_bar(
         self,
         days: int,
+        vt_symbol: str,
         interval: Interval = Interval.MINUTE,
         callback: Callable = None,
         use_database: bool = False
@@ -240,18 +239,19 @@ class DynamicCtaTemplate(ABC):
             callback = self.on_bars
 
         self.cta_engine.load_bar(
-            self.vt_symbol,
+            vt_symbol,
             days,
             interval,
             callback,
             use_database
         )
 
-    def load_tick(self, days: int):
+    # TODO, probably need change to load_ticks
+    def load_tick(self, days: int, vt_symbol: str):
         """
         Load historical tick data for initializing strategy.
         """
-        self.cta_engine.load_tick(self.vt_symbol, days, self.on_tick)
+        self.cta_engine.load_tick(vt_symbol, days, self.on_ticks)
 
     def put_event(self):
         """

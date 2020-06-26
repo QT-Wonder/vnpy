@@ -30,9 +30,9 @@ class DemoStrategy(DynamicCtaTemplate):
     config = {}
     current_date = ''
 
-    def __init__(self, cta_engine, strategy_name, vt_symbol, setting):
+    def __init__(self, cta_engine, strategy_name, setting):
         """"""
-        super().__init__(cta_engine, strategy_name, vt_symbol, setting)
+        super().__init__(cta_engine, strategy_name, setting)
 
         # TODO 调用聚宽接口，以后可以改成内部缓存，没必要每次都调用
         try:

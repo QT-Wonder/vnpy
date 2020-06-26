@@ -18,7 +18,9 @@ from vnpy.trader.constant import (Direction, Offset, Exchange,
                                   Interval, Status)
 from vnpy.trader.database import database_manager
 from vnpy.trader.object import OrderData, TradeData, BarData, TickData
-from vnpy.trader.utility import round_to
+from vnpy.trader.utility import extract_vt_symbol, round_to
+
+from vnpy.trader.setting import SETTINGS
 
 from .base import (
     BacktestingMode,
@@ -29,6 +31,7 @@ from .base import (
     INTERVAL_DELTA_MAP
 )
 from .template import DynamicCtaTemplate
+import jqdatasdk as jq
 
 # Set seaborn style
 sns.set_style("whitegrid")
@@ -47,6 +50,7 @@ class OptimizationSetting:
         """"""
         self.params = {}
         self.target_name = ""
+        jq.auth(SETTINGS["jqdata.username"], SETTINGS["jqdata.password"])
 
     def add_parameter(
         self, name: str, start: float, end: float = None, step: float = None
@@ -109,8 +113,6 @@ class BacktestingEngine:
     def __init__(self):
         """"""
         self.vt_symbol = ""
-        self.symbol = ""
-        self.exchange = None
         self.start = None
         self.end = None
         self.rate = 0
@@ -123,14 +125,16 @@ class BacktestingEngine:
 
         self.strategy_class = None
         self.strategy = None
-        self.tick: TickData
-        self.bar: BarData
+        self.ticks = {}
+        self.bars = {}
         self.datetime = None
 
         self.interval = None
         self.days = 0
         self.callback = None
-        self.history_data = []
+        self.history_data = {}
+        self.dts: Set[datetime] = set()
+        self.intrested_month = 2
 
         self.stop_order_count = 0
         self.stop_orders = {}
@@ -153,8 +157,8 @@ class BacktestingEngine:
         Clear all data of last backtesting.
         """
         self.strategy = None
-        self.tick = None
-        self.bar = None
+        self.ticks.clear()
+        self.bars.clear()
         self.datetime = None
 
         self.stop_order_count = 0
@@ -195,8 +199,7 @@ class BacktestingEngine:
         self.pricetick = pricetick
         self.start = start
 
-        self.symbol, exchange_str = self.vt_symbol.split(".")
-        self.exchange = Exchange(exchange_str)
+
 
         self.capital = capital
         self.end = end
@@ -207,7 +210,7 @@ class BacktestingEngine:
         """"""
         self.strategy_class = strategy_class
         self.strategy = strategy_class(
-            self, strategy_class.__name__, self.vt_symbol, setting
+            self, strategy_class.__name__, setting
         )
 
     def load_data(self):
@@ -221,76 +224,112 @@ class BacktestingEngine:
             self.output("起始日期必须小于结束日期")
             return
 
-        self.history_data.clear()       # Clear previously loaded history data
+        # Clear previously loaded history data
+        self.history_data.clear()       
+        self.dts.clear()
 
-        # Load 30 days of data each time and allow for progress update
-        progress_delta = timedelta(days=30)
+        # Load data until the future contract changed
         total_delta = self.end - self.start
-        interval_delta = INTERVAL_DELTA_MAP[self.interval]
+        interval_delta = INTERVAL_DELTA_MAP[self.interval] if self.mode == BacktestingMode.BAR else timedelta(seconds=1)
 
         start = self.start
-        end = self.start + progress_delta
+        end = start + timedelta(days=1)
         progress = 0
 
         while start < self.end:
-            end = min(end, self.end)  # Make sure end time stays within set range
+            
+            future_contracts = jq.get_future_contracts(self.vt_symbol, start.strftime('%Y-%m-%d'))
+            while(end < self.end):
+                next_future_contracts = jq.get_future_contracts(self.vt_symbol, end.strftime('%Y-%m-%d'))
+                if next_future_contracts == future_contracts:
+                    end = end + timedelta(days=1)
+                else:
+                    break
 
-            if self.mode == BacktestingMode.BAR:
-                data = load_bar_data(
-                    self.symbol,
-                    self.exchange,
-                    self.interval,
-                    start,
-                    end
-                )
-            else:
-                data = load_tick_data(
-                    self.symbol,
-                    self.exchange,
-                    start,
-                    end
-                )
-
-            self.history_data.extend(data)
-
-            progress += progress_delta / total_delta
+            end = min(end-timedelta(seconds=1), self.end)  # Make sure end time stays within set range
+            
+            for index in range(0, self.intrested_month):
+                vt_symbol = self.from_jq_exchange(future_contracts[index])
+                symbol, exchange = extract_vt_symbol(vt_symbol)
+                if self.mode == BacktestingMode.BAR:
+                    data = load_bar_data(
+                        symbol,
+                        exchange,
+                        self.interval,
+                        start,
+                        end
+                    )
+                else:
+                    data = load_tick_data(
+                        symbol,
+                        exchange,
+                        start,
+                        end
+                    )
+                data_count = 0
+                for d in data:
+                    self.dts.add(d.datetime)
+                    self.history_data[(d.datetime, index)] = (vt_symbol, d)
+                    data_count += 1
+                self.output(f"加载{vt_symbol}历史数据: {start} -- {end-timedelta(seconds=1)}，总数：{data_count}")
+            
+            progress += (end-start) / total_delta
             progress = min(progress, 1)
             progress_bar = "#" * int(progress * 10)
             self.output(f"加载进度：{progress_bar} [{progress:.0%}]")
 
             start = end + interval_delta
-            end += (progress_delta + interval_delta)
+            end = start + timedelta(days=1)
 
-        self.output(f"历史数据加载完成，数据量：{len(self.history_data)}")
+        self.output("所有历史数据加载完成")
+
+    def from_jq_exchange(self, jq_symbol: str):
+        symbole, exchange_str = jq_symbol.split('.')
+        if(exchange_str == 'XSHG'):
+            exchange_str = 'SSE'
+        if(exchange_str == 'XSHE'):
+            exchange_str = 'SZSE'
+        if(exchange_str == 'XSGE'):
+            exchange_str = 'SHFE'
+        if(exchange_str == 'CCFX'):
+            exchange_str = 'CFFEX'
+        if(exchange_str == 'XDCE'):
+            exchange_str = 'DCE'
+        if(exchange_str == 'XINE'):
+            exchange_str = 'INE'
+        return symbole + '.' + exchange_str
 
     def run_backtesting(self):
         """"""
         if self.mode == BacktestingMode.BAR:
-            func = self.new_bar
+            func = self.new_bars
         else:
-            func = self.new_tick
+            func = self.new_ticks
 
         self.strategy.on_init(self.mode)
+
+        # Generate sorted datetime list
+        dts = list(self.dts)
+        dts.sort()
 
         # Use the first [days] of history data for initializing strategy
         day_count = 0
         ix = 0
 
-        for ix, data in enumerate(self.history_data):
-            if self.datetime and data.datetime.day != self.datetime.day:
+        for ix, dt in enumerate(dts):
+            if self.datetime and dt.day != self.datetime.day:
                 day_count += 1
                 if day_count >= self.days:
                     break
 
-            self.datetime = data.datetime
-
-            try:
-                bars = {self.vt_symbol: data}
-                self.callback(bars)
-            except Exception:
-                self.output("触发异常，回测终止")
-                self.output(traceback.format_exc())
-                return
+            # TODO, disable try/catch to make debug easier
+            func(dt)
+            # try:
+            #     func(dt)
+            # except Exception:
+            #     self.output("触发异常，回测终止")
+            #     self.output(traceback.format_exc())
+            #     return
 
         self.strategy.inited = True
         self.output("策略初始化完成")
@@ -300,13 +339,15 @@ class BacktestingEngine:
         self.output("开始回放历史数据")
 
         # Use the rest of history data for running backtesting
-        for data in self.history_data[ix:]:
-            try:
-                func(data)
-            except Exception:
-                self.output("触发异常，回测终止")
-                self.output(traceback.format_exc())
-                return
+        for dt in dts[ix:]:
+            # TODO, disable try/catch to make debug easier
+            func(dt)
+            # try:
+            #     func(dt)
+            # except Exception:
+            #     self.output("触发异常，回测终止")
+            #     self.output(traceback.format_exc())
+            #     return
 
         self.output("历史数据回放结束")
 
@@ -739,9 +780,24 @@ class BacktestingEngine:
 
         return results
 
-    def update_daily_close(self, price: float):
+    def update_daily_close(self, datas, dt):
         """"""
-        d = self.datetime.date()
+        d = dt.date()
+
+        # TODO, need proper way to calculate daily close
+        price = 0
+        if self.mode == BacktestingMode.BAR:
+            # TODO
+            if not self.bars or not 0 in self.bars:
+                return
+            bar = self.bars[0][1]
+            price = bar.close_price
+        else:
+            # TODO
+            if not self.ticks or not 0 in self.ticks:
+                return
+            tick = self.ticks[0][1]
+            price = tick.last_price
 
         daily_result = self.daily_results.get(d, None)
         if daily_result:
@@ -749,42 +805,66 @@ class BacktestingEngine:
         else:
             self.daily_results[d] = DailyResult(d, price)
 
-    def new_bar(self, bar: BarData):
+    def new_bars(self, dt: datetime):
         """"""
-        self.bar = bar
-        self.datetime = bar.datetime
+        self.bars.clear()
+        self.datetime = dt
+
+        for index in range(0, self.intrested_month):
+            symbol_bar = self.history_data.get((dt, index), None)
+            if symbol_bar:
+                self.bars[index] = symbol_bar
+            else:
+                dt_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                self.output(f"数据缺失：{dt_str}, 月：{index}")
 
         self.cross_limit_order()
         self.cross_stop_order()
-        bars = {self.vt_symbol: bar}
-        self.strategy.on_bars(bars)
+        self.strategy.on_bars(self.bars)
 
-        self.update_daily_close(bar.close_price)
+        self.update_daily_close(self.bars, dt)
 
-    def new_tick(self, tick: TickData):
+    def new_ticks(self, dt: datetime):
         """"""
-        self.tick = tick
-        self.datetime = tick.datetime
+        self.ticks.clear()
+        self.datetime = dt
+
+        for index in range(0, self.intrested_month):
+            symbol_tick = self.history_data.get((dt, index), None)
+            if symbol_tick:
+                self.ticks[index] = symbol_tick
+            else:
+                dt_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                self.output(f"数据缺失：{dt_str}, 月：{index}")
 
         self.cross_limit_order()
         self.cross_stop_order()
-        ticks = {ga_vt_symbol: tick}
-        self.strategy.on_ticks(ticks)
+        self.strategy.on_ticks(self.ticks)
 
-        self.update_daily_close(tick.last_price)
+        self.update_daily_close(self.ticks, dt)
 
     def cross_limit_order(self):
         """
         Cross limit order with last bar/tick data.
         """
+
+        # TODO, need proper way
         if self.mode == BacktestingMode.BAR:
-            long_cross_price = self.bar.low_price
-            short_cross_price = self.bar.high_price
-            long_best_price = self.bar.open_price
-            short_best_price = self.bar.open_price
+            # TODO
+            if not self.bars or not 0 in self.bars:
+                return
+            bar = self.bars[0][1]
+            long_cross_price = bar.low_price
+            short_cross_price = bar.high_price
+            long_best_price = bar.open_price
+            short_best_price = bar.open_price
         else:
-            long_cross_price = self.tick.ask_price_1
-            short_cross_price = self.tick.bid_price_1
+            # TODO
+            if not self.ticks or not 0 in self.ticks:
+                return
+            tick = self.ticks[0][1]
+            long_cross_price = tick.ask_price_1
+            short_cross_price = tick.bid_price_1
             long_best_price = long_cross_price
             short_best_price = short_cross_price
 
@@ -849,14 +929,26 @@ class BacktestingEngine:
         """
         Cross stop order with last bar/tick data.
         """
+        # TODO, need proper way
+        vt_symbol = ''
         if self.mode == BacktestingMode.BAR:
-            long_cross_price = self.bar.high_price
-            short_cross_price = self.bar.low_price
-            long_best_price = self.bar.open_price
-            short_best_price = self.bar.open_price
+            # TODO
+            if not self.bars or not 0 in self.bars:
+                return
+            bar = self.bars[0][1]
+            vt_symbol = self.bars[0][0]
+            long_cross_price = bar.high_price
+            short_cross_price = bar.low_price
+            long_best_price = bar.open_price
+            short_best_price = bar.open_price
         else:
-            long_cross_price = self.tick.last_price
-            short_cross_price = self.tick.last_price
+            # TODO
+            if not self.ticks or not 0 in self.ticks:
+                return
+            tick = self.ticks[0][1]
+            vt_symbol = self.ticks[0][0]
+            long_cross_price = tick.last_price
+            short_cross_price = tick.last_price
             long_best_price = long_cross_price
             short_best_price = short_cross_price
 
@@ -878,9 +970,11 @@ class BacktestingEngine:
             # Create order data.
             self.limit_order_count += 1
 
+            symbol, exchange_str = vt_symbol.split(".")
+            exchange = Exchange(exchange_str)
             order = OrderData(
-                symbol=self.symbol,
-                exchange=self.exchange,
+                symbol=symbol,
+                exchange=exchange,
                 orderid=str(self.limit_order_count),
                 direction=stop_order.direction,
                 offset=stop_order.offset,
@@ -951,8 +1045,8 @@ class BacktestingEngine:
 
     def send_order(
         self,
-        vt_symbol: str,
         strategy: DynamicCtaTemplate,
+        vt_symbol: str,
         direction: Direction,
         offset: Offset,
         price: float,
@@ -1005,9 +1099,11 @@ class BacktestingEngine:
         """"""
         self.limit_order_count += 1
 
+        symbol, exchange_str = vt_symbol.split(".")
+        exchange = Exchange(exchange_str)
         order = OrderData(
-            symbol=self.symbol,
-            exchange=self.exchange,
+            symbol=symbol,
+            exchange=exchange,
             orderid=str(self.limit_order_count),
             direction=direction,
             offset=offset,

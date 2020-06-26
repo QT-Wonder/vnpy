@@ -162,7 +162,7 @@ class QTWonderBacktesterManager(QtWidgets.QWidget):
         form = QtWidgets.QFormLayout()
         form.addRow("交易策略", self.class_combo)
         form.addRow("回测模式", self.backtest_mode_combo)
-        form.addRow("本地代码", self.symbol_line)
+        form.addRow("基本代码", self.symbol_line)
         form.addRow("K线周期", self.interval_combo)
         form.addRow("开始日期", self.start_date_edit)
         form.addRow("结束日期", self.end_date_edit)

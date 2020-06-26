@@ -7,7 +7,8 @@ from vnpy.trader.constant import Interval, Exchange
 from vnpy.trader.object import TickData, HistoryRequest
 from vnpy.trader.database import database_manager
 from vnpy.trader.mddata import mddata_client
-
+# 调用Pandas识别时间格式
+import pandas as pd
 
 APP_NAME = "TickDataManager"
 
@@ -53,14 +54,15 @@ class TickManagerEngine(BaseEngine):
         count = 0
 
         for item in reader:
-            if datetime_format:
-                dt = datetime.strptime(item[datetime_head], datetime_format)
-            else:
-                dt = datetime.fromisoformat(item[datetime_head])
+            # if datetime_format:
+            #     dt = datetime.strptime(item[datetime_head], datetime_format)
+            # else:
+            #     dt = datetime.fromisoformat(item[datetime_head])
 
             open_interest = item.get(open_interest_head, 0)
-
-            dt = datetime.strptime(item[datetime_head], datetime_format)
+            # 通用时间格式
+            # dt =datetime.strptime(str(pd.to_datetime(item[datetime_head])), '%Y-%m-%d %H:%M:%S.%f')
+            dt = datetime.strptime(str(pd.to_datetime(item[datetime_head]).strftime('%Y-%m-%d %H:%M:%S.%f')), '%Y-%m-%d %H:%M:%S.%f')
             tick = TickData(
                 symbol=symbol,
                 exchange=exchange,

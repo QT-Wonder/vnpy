@@ -11,24 +11,28 @@ from vnpy.app.dynamic_cta_strategy import (
 
 from typing import Dict
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 import jqdatasdk as jq
 import pandas as pd
 from vnpy.trader.setting import SETTINGS
 from vnpy.app.dynamic_cta_strategy.base import BacktestingMode
 
+from vnpy.trader.database import database_manager
+from vnpy.trader.utility import extract_vt_symbol
+from vnpy.trader.constant import Interval
+
 class DemoStrategy(DynamicCtaTemplate):
     author = "QT-WOnder"
 
-    underlying_symbol = 'IC'
-    tick_count = 0
-    test_all_done = False
+    # underlying_symbol = 'IC'
+    # tick_count = 0
+    # test_all_done = False
 
-    parameters = ["underlying_symbol"]
-    variables = ["tick_count", "test_all_done"]
+    # parameters = ["underlying_symbol"]
+    # variables = ["tick_count", "test_all_done"]
 
     config = {}
-    current_date = ''
+    fixed_size = 1
 
     def __init__(self, cta_engine, strategy_name, setting):
         """"""
@@ -55,8 +59,8 @@ class DemoStrategy(DynamicCtaTemplate):
         self.config["code_02"] = ""
 
         # 利用tick数据生成bar数据
-        self.bg = BarGenerator(self.on_bar)
-        self.am = ArrayManager(self.config["k"] + self.config["n"])
+        # self.bg = BarGenerator(self.on_bar)
+        # self.am = ArrayManager(self.config["k"] + self.config["n"])
 
     def on_init(self, mode: BacktestingMode):
         """
@@ -64,10 +68,10 @@ class DemoStrategy(DynamicCtaTemplate):
         """
         print("策略初始化")
         
-        if mode == BacktestingMode.TICK:
-            self.load_tick(1)
-        else:
-            self.load_bar(10)
+        # if mode == BacktestingMode.TICK:
+        #     self.load_tick(1)
+        # else:
+        #     self.load_bar(10)
 
     def on_start(self):
         """
@@ -84,40 +88,35 @@ class DemoStrategy(DynamicCtaTemplate):
 
         self.put_event()
 
-    def on_ticks(self, ticks: Dict[str, TickData]):
+    def on_ticks(self, ticks):
         """
         Callback of new tick data update.
         """
 
-        # TODO 如何拿到另一个合约
-        
+        if not ticks or not 0 in ticks or not 1 in ticks:
+            return
 
-        # 更新近月，远月
-        tickDate = tick.datetime.strftime('%Y-%m-%d')
-        if self.current_date != tickDate:
-            self.current_date = tickDate
-            # 选择01、02
-            future_contract = jq.get_future_contracts(self.underlying_symbol, self.current_date)
-            new_code_01 = future_contract[0]
-            new_code_02 = future_contract[1]
-            if self.config["code_01"] != new_code_01:
-                print("new code 01: " + new_code_01 + ", old code 01: " + self.config["code_01"] + ", current date: " + self.current_date)
-                self.config["code_01"] = new_code_01
-                # 交割日
-                self.config["de_date"] = self.get_CCFX_end_date(self.config["code_01"])
-                print("交割日： " + self.config["de_date"].strftime("%Y/%m/%d, %H:%M:%S") + ", current date: " + self.current_date)
-            if self.config["code_02"] != new_code_02:
-                print("new code 02: " + new_code_02 + ", old code 02: " + self.config["code_02"] + ", current date: " + self.current_date)
-                self.config["code_02"] = new_code_02
+        near_month_vt_symbol = ticks[0][0]
+        near_month_tick = ticks[0][1]
+        far_month_vt_symbol = ticks[1][0]
+        far_month_tick = ticks[1][1]
+
+
+        if self.config["code_01"] != near_month_vt_symbol:
+            self.config["code_01"] = near_month_vt_symbol
+            # 交割日
+            self.config["de_date"] = self.get_CCFX_end_date(self.config["code_01"])
+        if self.config["code_02"] != far_month_vt_symbol:
+            self.config["code_02"] = far_month_vt_symbol
                 
         # 下面的计算会在 on_bar 里完成
         # 计算信号
-        # if (tick.datetime.second == 0):
-        #     self.spread_cal()
+        if True: # near_month_tick.datetime.second == 0:
+            self.spread_cal(near_month_tick.datetime)
         
         # 交易时间限制 交割日
-        if tick.datetime == self.config["de_date"]:
-            de_sign = tick.datetime.time() < self.config["close_time"]
+        if near_month_tick.datetime == self.config["de_date"]:
+            de_sign = near_month_tick.datetime.time() < self.config["close_time"]
         else:
             de_sign = 1
 
@@ -129,53 +128,52 @@ class DemoStrategy(DynamicCtaTemplate):
         # JQ data structure
         # future_tick_fields = ['datetime', 'current', 'high', 'low', 'volume', 'money', 'position', 'a1_p', 'a1_v', 'b1_p', 'b1_v']
 
-        # tick数据存在时读取数据，不足时跳过
-        if (type(tick_data_01).__name__ == 'Tick') & (type(tick_data_02).__name__ == 'Tick'):
-            a_01 = tick_data_01.a1_p
-            b_01 = tick_data_01.b1_p
-            a_02 = tick_data_02.a1_p
-            b_02 = tick_data_02.b1_p
-        else:
-            return 0
+
+        a_01 = near_month_tick.ask_price_1
+        b_01 = near_month_tick.bid_price_1
+        a_02 = far_month_tick.ask_price_1
+        b_02 = far_month_tick.bid_price_1
+
         
         spread_delta_1 = a_01 - b_02
         spread_delta_2 = b_01 - a_02
 
         
-        len_short = len(context.portfolio.short_positions)
-        len_long = len(context.portfolio.long_positions)
+        len_short = 0 # len(context.portfolio.short_positions)
+        len_long = 0 # len(context.portfolio.long_positions)
         
         # 开仓
         if (len_short == 0) and (len_long == 0) & (de_sign):
             # 向下突破布林线+判别因子通过，做多
             if (spread_delta_1 < self.config["lower"]) & (self.config["ito"] < self.config["e"]):
-                order(self.config["code_01"], 1, side='long')
-                order(self.config["code_02"], 1, side='short')
+                # order(self.config["code_01"], 1, side='long')
+                self.buy(self.config["code_01"], near_month_tick.last_price+5, self.fixed_size)
+                # order(self.config["code_02"], 1, side='short')
+                self.sell(self.config["code_02"], far_month_tick.last_price-5, self.fixed_size)
+
             elif (spread_delta_2 > self.config["upper"])  & (self.config["ito"] < self.config["e"]):
-                order(self.config["code_01"], 1, side='short')
-                order(self.config["code_02"], 1, side='long')
+                # order(self.config["code_01"], 1, side='short')
+                self.sell(self.config["code_01"], near_month_tick.last_price-5, self.fixed_size)
+                # order(self.config["code_02"], 1, side='long')
+                self.buy(self.config["code_02"], far_month_tick.last_price+5, self.fixed_size)
         # 平仓
-        elif (len_short > 0) and (len_long > 0):
-            long_code = list(context.portfolio.long_positions.keys())[0]
-            if de_sign:
-                if (spread_delta_2 > self.config["ma"]) & (long_code == self.config["code_01"]):
-                    order_target(self.config["code_01"], 0, side='long')
-                    order_target(self.config["code_02"], 0, side='short')
-                elif (spread_delta_1 < self.config["ma"]) & (long_code == self.config["code_02"]):
-                    order_target(self.config["code_01"], 0, side='short')
-                    order_target(self.config["code_02"], 0, side='long')
-            else:
-                # 交割日强制平仓
-                order_target(long_code, 0, side='long')
-                order_target(list(context.portfolio.short_positions.keys())[0], 0, side='short')
+        # elif (len_short > 0) and (len_long > 0):
+        #     long_code = list(context.portfolio.long_positions.keys())[0]
+        #     if de_sign:
+        #         if (spread_delta_2 > self.config["ma"]) & (long_code == self.config["code_01"]):
+        #             order_target(self.config["code_01"], 0, side='long')
+        #             order_target(self.config["code_02"], 0, side='short')
+        #         elif (spread_delta_1 < self.config["ma"]) & (long_code == self.config["code_02"]):
+        #             order_target(self.config["code_01"], 0, side='short')
+        #             order_target(self.config["code_02"], 0, side='long')
+        #     else:
+        #         # 交割日强制平仓
+        #         order_target(long_code, 0, side='long')
+        #         order_target(list(context.portfolio.short_positions.keys())[0], 0, side='short')
 
-        self.bg.update_tick(tick)
+        # self.bg.update_tick(tick)
 
-    def order(self, symbol: str, dir: int, side:str):
-        return
-    
-    def order_target(self, symbol: str, dir: int, side:str):
-        return
+
     
     def on_bar(self, bar: BarData):
         """
@@ -185,36 +183,29 @@ class DemoStrategy(DynamicCtaTemplate):
 
         # 更新am
         self.am.update_bar(bar)
-
-        # barDate = bar.datetime.strftime('%Y-%m-%d')
-        # if self.current_date != barDate:
-        #     self.current_date = barDate
-        #     ## 选择01、02
-        #     future_contract = jq.get_future_contracts(self.underlying_symbol, self.current_date)
-        #     new_code_01 = future_contract[0]
-        #     new_code_02 = future_contract[1]
-        #     if self.config["code_01"] != new_code_01:
-        #         print("new code 01: " + new_code_01 + ", old code 01: " + self.config["code_01"] + ", current date: " + self.current_date)
-        #         self.config["code_01"] = new_code_01
-        #         # 交割日
-        #         self.config["de_date"] = self.get_CCFX_end_date(self.config["code_01"])
-        #         print("交割日： " + self.config["de_date"].strftime("%Y/%m/%d, %H:%M:%S") + ", current date: " + self.current_date)
-        #     if self.config["code_02"] != new_code_02:
-        #         print("new code 02: " + new_code_02 + ", old code 02: " + self.config["code_02"] + ", current date: " + self.current_date)
-        #         self.config["code_02"] = new_code_02
-        
-
-        # print("----on_bar----" + datetime.now().strftime("%Y/%m/%d, %H:%M:%S"))
-        # print("-----" + bar.datetime.strftime("%Y/%m/%d, %H:%M:%S"))
-        # print(bar)
-
-        
+       
 
         self.put_event()
 
-    def spread_cal(self):
-        bar_1 = pd.Series(jq.get_bars(self.config["code_01"], self.config["k"] + self.config["n"], unit='1m', fields=['close'])['close'])
-        bar_2 = pd.Series(jq.get_bars(self.config["code_02"], self.config["k"] + self.config["n"], unit='1m', fields=['close'])['close'])
+    def spread_cal(self, end: datetime):
+
+        start = end - timedelta(minutes=self.config["k"] + self.config["n"])
+        symbol, exchange = extract_vt_symbol(self.config["code_01"])
+        bar_1 = database_manager.load_bar_data(symbol, exchange, Interval.MINUTE, start, end)
+        near_bar_close = []
+        for bar in bar_1:
+            near_bar_close.append(bar.close_price)
+        bar_1 = pd.Series(near_bar_close)
+
+        symbol, exchange = extract_vt_symbol(self.config["code_02"])
+        bar_2 = database_manager.load_bar_data(symbol, exchange, Interval.MINUTE, start, end)
+        far_bar_close = []
+        for bar in bar_2:
+            far_bar_close.append(bar.close_price)
+        bar_2 = pd.Series(far_bar_close)
+        
+        # bar_1 = pd.Series(jq.get_bars(self.config["code_01"], self.config["k"] + self.config["n"], unit='1m', fields=['close'])['close'])
+        # bar_2 = pd.Series(jq.get_bars(self.config["code_02"], self.config["k"] + self.config["n"], unit='1m', fields=['close'])['close'])
         # 数据足够时产生信号，不足时跳过交易
         if (len(bar_1) > 0) & (len(bar_2) > 0):
             # 价差
@@ -248,7 +239,8 @@ class DemoStrategy(DynamicCtaTemplate):
     # 获取金融期货合约到期日
     def get_CCFX_end_date(self, future_code):
         # 获取金融期货合约到期日
-        return jq.get_security_info(future_code).end_date
+        # TODO, need move out
+        return jq.get_security_info(future_code.replace("CFFEX", "CCFX")).end_date
 
     def on_order(self, order: OrderData):
         """

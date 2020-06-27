@@ -237,7 +237,7 @@ class BacktestingEngine:
         progress = 0
 
         while start < self.end:
-            
+            # TODO, need remove the call to JQ API
             future_contracts = jq.get_future_contracts(self.vt_symbol, start.strftime('%Y-%m-%d'))
             while(end < self.end):
                 next_future_contracts = jq.get_future_contracts(self.vt_symbol, end.strftime('%Y-%m-%d'))
@@ -816,7 +816,7 @@ class BacktestingEngine:
                 self.bars[index] = symbol_bar
             else:
                 dt_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-                self.output(f"数据缺失：{dt_str}, 月：{index}")
+                self.output(f"new_bars数据缺失：{dt_str}, 月：{index}")
 
         self.cross_limit_order()
         self.cross_stop_order()
@@ -835,7 +835,7 @@ class BacktestingEngine:
                 self.ticks[index] = symbol_tick
             else:
                 dt_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-                self.output(f"数据缺失：{dt_str}, 月：{index}")
+                self.output(f"new_ticks数据缺失：{dt_str}, 月：{index}")
 
         self.cross_limit_order()
         self.cross_stop_order()

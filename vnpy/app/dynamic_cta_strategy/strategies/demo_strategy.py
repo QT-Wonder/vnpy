@@ -138,7 +138,7 @@ class DemoStrategy(DynamicCtaTemplate):
         spread_delta_1 = a_01 - b_02
         spread_delta_2 = b_01 - a_02
 
-        
+        # TODO
         len_short = 0 # len(context.portfolio.short_positions)
         len_long = 0 # len(context.portfolio.long_positions)
         
@@ -147,29 +147,38 @@ class DemoStrategy(DynamicCtaTemplate):
             # 向下突破布林线+判别因子通过，做多
             if (spread_delta_1 < self.config["lower"]) & (self.config["ito"] < self.config["e"]):
                 # order(self.config["code_01"], 1, side='long')
-                self.buy(self.config["code_01"], near_month_tick.last_price+5, self.fixed_size)
+                self.buy(self.config["code_01"], a_01, self.fixed_size)
                 # order(self.config["code_02"], 1, side='short')
-                self.sell(self.config["code_02"], far_month_tick.last_price-5, self.fixed_size)
+                self.short(self.config["code_02"], b_02, self.fixed_size)
 
             elif (spread_delta_2 > self.config["upper"])  & (self.config["ito"] < self.config["e"]):
                 # order(self.config["code_01"], 1, side='short')
-                self.sell(self.config["code_01"], near_month_tick.last_price-5, self.fixed_size)
+                self.short(self.config["code_01"], b_01, self.fixed_size)
                 # order(self.config["code_02"], 1, side='long')
-                self.buy(self.config["code_02"], far_month_tick.last_price+5, self.fixed_size)
+                self.buy(self.config["code_02"], a_02, self.fixed_size)
         # 平仓
-        # elif (len_short > 0) and (len_long > 0):
-        #     long_code = list(context.portfolio.long_positions.keys())[0]
-        #     if de_sign:
-        #         if (spread_delta_2 > self.config["ma"]) & (long_code == self.config["code_01"]):
-        #             order_target(self.config["code_01"], 0, side='long')
-        #             order_target(self.config["code_02"], 0, side='short')
-        #         elif (spread_delta_1 < self.config["ma"]) & (long_code == self.config["code_02"]):
-        #             order_target(self.config["code_01"], 0, side='short')
-        #             order_target(self.config["code_02"], 0, side='long')
-        #     else:
-        #         # 交割日强制平仓
-        #         order_target(long_code, 0, side='long')
-        #         order_target(list(context.portfolio.short_positions.keys())[0], 0, side='short')
+        elif (len_short > 0) and (len_long > 0):
+            # TODO
+            long_code = '' #list(context.portfolio.long_positions.keys())[0]
+            if de_sign:
+                if (spread_delta_2 > self.config["ma"]) & (long_code == self.config["code_01"]):
+                    # order_target(self.config["code_01"], 0, side='long')
+                    self.cover(self.config["code_01"], b_01, near_month_tick.open_interest)
+                    # order_target(self.config["code_02"], 0, side='short')
+                    self.sell(self.config["code_02"], a_02, far_month_tick.open_interest)
+                elif (spread_delta_1 < self.config["ma"]) & (long_code == self.config["code_02"]):
+                    # order_target(self.config["code_01"], 0, side='short')
+                    self.sell(self.config["code_01"], a_01, near_month_tick.open_interest)
+                    # order_target(self.config["code_02"], 0, side='long')
+                    self.cover(self.config["code_02"], b_02, far_month_tick.open_interest)
+            else:
+                # 交割日强制平仓
+                # order_target(long_code, 0, side='long')
+                code, price, volume = self.config['code_01'], b_01, near_month_tick.open_interest if long_code == self.config["code_01"] else self.config['code_02'], b_02, far_month_tick.open_interest
+                self.cover(code, price, volume)
+                # order_target(list(context.portfolio.short_positions.keys())[0], 0, side='short')
+                code, price, volume = self.config['code_01'], a_01, near_month_tick.open_interest if long_code == self.config["code_01"] else self.config['code_02'], a_02, far_month_tick.open_interest
+                self.sell(code, price, volume)
 
         # self.bg.update_tick(tick)
 
@@ -203,7 +212,7 @@ class DemoStrategy(DynamicCtaTemplate):
         for bar in bar_2:
             far_bar_close.append(bar.close_price)
         bar_2 = pd.Series(far_bar_close)
-        
+
         # bar_1 = pd.Series(jq.get_bars(self.config["code_01"], self.config["k"] + self.config["n"], unit='1m', fields=['close'])['close'])
         # bar_2 = pd.Series(jq.get_bars(self.config["code_02"], self.config["k"] + self.config["n"], unit='1m', fields=['close'])['close'])
         # 数据足够时产生信号，不足时跳过交易

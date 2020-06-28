@@ -31,7 +31,8 @@ from .base import (
     STOPORDER_PREFIX,
     StopOrder,
     StopOrderStatus,
-    INTERVAL_DELTA_MAP
+    INTERVAL_DELTA_MAP,
+    bar_cache
 )
 from .template import DynamicCtaTemplate
 import jqdatasdk as jq
@@ -243,6 +244,9 @@ class BacktestingEngine:
             self.output("起始日期必须小于结束日期")
             return
 
+        # clear previously loaded bar cache
+        bar_cache.clear()
+
         # Clear previously loaded history data
         self.history_data.clear()       
         self.dts.clear()
@@ -274,6 +278,11 @@ class BacktestingEngine:
 
             end = min(end-timedelta(seconds=1), self.end)  # Make sure end time stays within set range
             
+            # need bar data for near month since end
+            bar_cache.set_bar_end(future_contracts[0], end)
+            # need bar data for far month since start
+            bar_cache.set_bar_start(future_contracts[1], start)
+
             print(f'qt-wonder perf: get future contracts in backtesting: {time.perf_counter()-now} seconds!')
 
             for index in range(0, self.intrested_month):
@@ -281,6 +290,7 @@ class BacktestingEngine:
 
                 vt_symbol = self.from_jq_exchange(future_contracts[index])
                 symbol, exchange = extract_vt_symbol(vt_symbol)
+                data = []
                 if self.mode == BacktestingMode.BAR:
                     data = load_bar_data(
                         symbol,
@@ -315,6 +325,9 @@ class BacktestingEngine:
 
             start = end + interval_delta
             end = start + timedelta(days=1)
+
+        # load bar data to cache
+        bar_cache.load_bar_data()
 
         self.output("所有历史数据加载完成")
 
@@ -406,7 +419,7 @@ class BacktestingEngine:
             self.output(f"缺失数据存放在：{missing_data_log}")
             with open(missing_data_log, 'w') as filehandle:
                 filehandle.writelines("%s\n" % place for place in self.missing_data)
-        self.output(f'qt-wonder perf: train strategy in backtesting: {time.perf_counter()-now} seconds!')
+        self.output(f'qt-wonder perf: run backtesting: {time.perf_counter()-now} seconds!')
 
     def calculate_result(self):
         """"""

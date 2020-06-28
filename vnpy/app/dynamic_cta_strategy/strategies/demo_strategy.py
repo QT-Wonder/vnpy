@@ -1,13 +1,4 @@
-from vnpy.app.dynamic_cta_strategy import (
-    DynamicCtaTemplate,
-    StopOrder,
-    TickData,
-    BarData,
-    TradeData,
-    OrderData,
-    BarGenerator,
-    ArrayManager,
-)
+from vnpy.app.dynamic_cta_strategy import ArrayManager, BarData, BarGenerator, DynamicCtaTemplate, OrderData, StopOrder, TickData, TradeData
 
 from typing import Dict
 import csv
@@ -15,7 +6,7 @@ from datetime import datetime, timedelta
 import jqdatasdk as jq
 import pandas as pd
 from vnpy.trader.setting import SETTINGS
-from vnpy.app.dynamic_cta_strategy.base import BacktestingMode
+from vnpy.app.dynamic_cta_strategy.base import BacktestingMode, bar_cache
 
 from vnpy.trader.database import database_manager
 from vnpy.trader.utility import extract_vt_symbol
@@ -216,21 +207,28 @@ class DemoStrategy(DynamicCtaTemplate):
     def spread_cal(self, end: datetime):
 
         bar_count = self.config["k"] + self.config["n"]
-        start = end - timedelta(days=int(bar_count/(4*60))+1)
-        symbol, exchange = extract_vt_symbol(self.config["code_01"])
-        bar_1 = database_manager.load_bar_data(symbol, exchange, Interval.MINUTE, start, end)[-bar_count:]
-        near_bar_close = []
-        for bar in bar_1:
-            near_bar_close.append(bar.close_price)
+
+        # use database_manager to get bar data
+        # start = end - timedelta(days=int(bar_count/(4*60))+1)
+        # symbol, exchange = extract_vt_symbol(self.config["code_01"])
+        # bar_1 = database_manager.load_bar_data(symbol, exchange, Interval.MINUTE, start, end)[-bar_count:]
+        # near_bar_close = []
+        # for bar in bar_1:
+        #     near_bar_close.append(bar.close_price)
+        
+        near_bar_close = bar_cache.get_bar_close(self.config["code_01"], end.strftime('%Y-%m-%d %H:%M:%S'), bar_count)
         bar_1 = pd.Series(near_bar_close)
 
-        symbol, exchange = extract_vt_symbol(self.config["code_02"])
-        bar_2 = database_manager.load_bar_data(symbol, exchange, Interval.MINUTE, start, end)[-bar_count:]
-        far_bar_close = []
-        for bar in bar_2:
-            far_bar_close.append(bar.close_price)
-        bar_2 = pd.Series(far_bar_close)
+        # use database_manager to get bar data
+        # symbol, exchange = extract_vt_symbol(self.config["code_02"])
+        # bar_2 = database_manager.load_bar_data(symbol, exchange, Interval.MINUTE, start, end)[-bar_count:]
+        # far_bar_close = []
+        # for bar in bar_2:
+        #     far_bar_close.append(bar.close_price)
 
+        far_bar_close = bar_cache.get_bar_close(self.config["code_02"], end.strftime('%Y-%m-%d %H:%M:%S'), bar_count)
+        bar_2 = pd.Series(far_bar_close)
+        
         # bar_1 = pd.Series(jq.get_bars(self.config["code_01"], self.config["k"] + self.config["n"], unit='1m', fields=['close'])['close'])
         # bar_2 = pd.Series(jq.get_bars(self.config["code_02"], self.config["k"] + self.config["n"], unit='1m', fields=['close'])['close'])
         # 数据足够时产生信号，不足时跳过交易

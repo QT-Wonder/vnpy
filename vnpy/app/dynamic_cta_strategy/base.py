@@ -7,6 +7,7 @@ from enum import Enum
 from datetime import timedelta
 
 from vnpy.trader.constant import Direction, Offset, Interval
+from .bar_cache import BarCache
 
 APP_NAME = "CtaStrategy"
 STOPORDER_PREFIX = "STOP"
@@ -51,3 +52,5 @@ INTERVAL_DELTA_MAP = {
     Interval.HOUR: timedelta(hours=1),
     Interval.DAILY: timedelta(days=1),
 }
+
+bar_cache = BarCache()

@@ -27,7 +27,7 @@ from vnpy.app.dynamic_cta_strategy.base import BacktestingMode
 class QTWonderBacktesterManager(QtWidgets.QWidget):
     """"""
 
-    setting_filename = "cta_backtester_setting.json"
+    setting_filename = "dynamic_cta_backtester_setting.json"
 
     bulk_backtest_result = {}
     is_bulk_backtest = False

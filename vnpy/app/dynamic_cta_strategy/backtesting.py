@@ -3,11 +3,10 @@ from datetime import date, datetime, timedelta
 from typing import Callable
 from itertools import product
 from functools import lru_cache
-from time import time
+import time
 import multiprocessing
 import random
 import traceback
-
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -154,6 +153,8 @@ class BacktestingEngine:
 
         self.logs = []
 
+        self.missing_data = []
+
         self.daily_results = {}
         self.daily_df = None
 
@@ -190,6 +191,7 @@ class BacktestingEngine:
         self.trades.clear()
 
         self.logs.clear()
+        self.missing_data.clear()
         self.daily_results.clear()
 
     def set_parameters(
@@ -260,6 +262,8 @@ class BacktestingEngine:
         progress = 0
 
         while start < self.end:
+            now = time.perf_counter()
+
             future_contracts = self.get_future_contracts(start) 
             while(end < self.end):
                 next_future_contracts = self.get_future_contracts(end)
@@ -270,7 +274,11 @@ class BacktestingEngine:
 
             end = min(end-timedelta(seconds=1), self.end)  # Make sure end time stays within set range
             
+            print(f'qt-wonder perf: get future contracts in backtesting: {time.perf_counter()-now} seconds!')
+
             for index in range(0, self.intrested_month):
+                now = time.perf_counter()
+
                 vt_symbol = self.from_jq_exchange(future_contracts[index])
                 symbol, exchange = extract_vt_symbol(vt_symbol)
                 if self.mode == BacktestingMode.BAR:
@@ -288,13 +296,18 @@ class BacktestingEngine:
                         start,
                         end
                     )
+                print(f'qt-wonder perf: load data in backtesting: {time.perf_counter()-now} seconds!')
+
+                now = time.perf_counter()
+
                 data_count = 0
                 for d in data:
                     self.dts.add(d.datetime)
                     self.history_data[(d.datetime, index)] = (vt_symbol, d)
                     data_count += 1
                 self.output(f"加载{vt_symbol}历史数据: {start} -- {end-timedelta(seconds=1)}，总数：{data_count}")
-            
+                print(f'qt-wonder perf: add to dts in backtesting: {time.perf_counter()-now} seconds!')
+
             progress += (end-start) / total_delta
             progress = min(progress, 1)
             progress_bar = "#" * int(progress * 10)
@@ -330,6 +343,7 @@ class BacktestingEngine:
 
     def run_backtesting(self):
         """"""
+        self.missing_data.clear()
         if self.mode == BacktestingMode.BAR:
             func = self.new_bars
         else:
@@ -338,12 +352,16 @@ class BacktestingEngine:
         self.strategy.on_init(self.mode)
 
         # Generate sorted datetime list
+        now = time.perf_counter()
         dts = list(self.dts)
         dts.sort()
+        self.output(f'qt-wonder perf: sort dates for backtesting: {time.perf_counter()-now} seconds!')
 
         # Use the first [days] of history data for initializing strategy
         day_count = 0
         ix = 0
+
+        now = time.perf_counter()
 
         for ix, dt in enumerate(dts):
             if self.datetime and dt.day != self.datetime.day:
@@ -359,6 +377,10 @@ class BacktestingEngine:
             #     self.output("触发异常，回测终止")
             #     self.output(traceback.format_exc())
             #     return
+
+        self.output(f'qt-wonder perf: train strategy in backtesting: {time.perf_counter()-now} seconds!')
+
+        now = time.perf_counter()
 
         self.strategy.inited = True
         self.output("策略初始化完成")
@@ -379,6 +401,12 @@ class BacktestingEngine:
             #     return
 
         self.output("历史数据回放结束")
+        if len(self.missing_data) > 0:
+            missing_data_log = Path.cwd().joinpath('qtwonder').joinpath('missing_data.txt')
+            self.output(f"缺失数据存放在：{missing_data_log}")
+            with open(missing_data_log, 'w') as filehandle:
+                filehandle.writelines("%s\n" % place for place in self.missing_data)
+        self.output(f'qt-wonder perf: train strategy in backtesting: {time.perf_counter()-now} seconds!')
 
     def calculate_result(self):
         """"""
@@ -845,7 +873,7 @@ class BacktestingEngine:
                 self.bars[index] = symbol_bar
             else:
                 dt_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-                self.output(f"new_bars数据缺失：{dt_str}, 月：{index}")
+                self.missing_data.append(f"new_bars数据缺失日期：{dt_str},月：{index}")
 
         self.cross_limit_order()
         self.cross_stop_order()
@@ -864,7 +892,7 @@ class BacktestingEngine:
                 self.ticks[index] = symbol_tick
             else:
                 dt_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-                self.output(f"new_ticks数据缺失：{dt_str}, 月：{index}")
+                self.missing_data.append(f"new_ticks数据缺失日期：{dt_str},月：{index}")
 
         self.cross_limit_order()
         self.cross_stop_order()

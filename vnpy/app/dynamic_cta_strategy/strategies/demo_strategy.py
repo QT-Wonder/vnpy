@@ -48,6 +48,7 @@ class DemoStrategy(DynamicCtaTemplate):
             return
 
         # 初始变量
+        self.firstrun = True
         self.config["a"] = 1
         self.config["m"] = 60
         self.config["n"] = 270
@@ -91,6 +92,7 @@ class DemoStrategy(DynamicCtaTemplate):
         """
         Callback when strategy is started.
         """
+        self.firstrun = True
         print("策略启动")
         self.put_event()
 
@@ -125,8 +127,9 @@ class DemoStrategy(DynamicCtaTemplate):
                 
         # 下面的计算会在 on_bar 里完成
         # 计算信号
-        if True: # near_month_tick.datetime.second == 0:
+        if self.firstrun or near_month_tick.datetime.second == 0:
             self.spread_cal(near_month_tick.datetime)
+            self.firstrun = False
         
         # 交易时间限制 交割日
         if near_month_tick.datetime == self.config["de_date"]:
@@ -212,16 +215,17 @@ class DemoStrategy(DynamicCtaTemplate):
 
     def spread_cal(self, end: datetime):
 
-        start = end - timedelta(minutes=self.config["k"] + self.config["n"])
+        bar_count = self.config["k"] + self.config["n"]
+        start = end - timedelta(days=int(bar_count/(4*60))+1)
         symbol, exchange = extract_vt_symbol(self.config["code_01"])
-        bar_1 = database_manager.load_bar_data(symbol, exchange, Interval.MINUTE, start, end)
+        bar_1 = database_manager.load_bar_data(symbol, exchange, Interval.MINUTE, start, end)[-bar_count:]
         near_bar_close = []
         for bar in bar_1:
             near_bar_close.append(bar.close_price)
         bar_1 = pd.Series(near_bar_close)
 
         symbol, exchange = extract_vt_symbol(self.config["code_02"])
-        bar_2 = database_manager.load_bar_data(symbol, exchange, Interval.MINUTE, start, end)
+        bar_2 = database_manager.load_bar_data(symbol, exchange, Interval.MINUTE, start, end)[-bar_count:]
         far_bar_close = []
         for bar in bar_2:
             far_bar_close.append(bar.close_price)

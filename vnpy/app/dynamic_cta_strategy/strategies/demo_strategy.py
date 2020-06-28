@@ -20,6 +20,8 @@ from vnpy.app.dynamic_cta_strategy.base import BacktestingMode
 from vnpy.trader.database import database_manager
 from vnpy.trader.utility import extract_vt_symbol
 from vnpy.trader.constant import Interval
+from vnpy.app.jq_api import jq_api_to_csv
+from pathlib import Path
 
 class DemoStrategy(DynamicCtaTemplate):
     author = "QT-WOnder"
@@ -57,6 +59,18 @@ class DemoStrategy(DynamicCtaTemplate):
         # near moth, far month
         self.config["code_01"] = ""
         self.config["code_02"] = ""
+
+        # load JQ API cache
+        cache_path = Path.cwd().joinpath('qtwonder').joinpath('IC_contract_enddate.csv')
+        if not cache_path.exists():
+            jq_api_to_csv.cache_jq_api('qtwonder')
+
+        self.IC_contract_end_date = {}
+        with open(cache_path, newline='') as csvfile:
+            reader = csv.reader(csvfile, delimiter=',')
+            next(reader, None)
+            for row in reader:
+                self.IC_contract_end_date[row[0]] = row[1]
 
         # 利用tick数据生成bar数据
         # self.bg = BarGenerator(self.on_bar)
@@ -248,7 +262,8 @@ class DemoStrategy(DynamicCtaTemplate):
     # 获取金融期货合约到期日
     def get_CCFX_end_date(self, future_code):
         # 获取金融期货合约到期日
-        # TODO, need move out
+        if future_code in self.IC_contract_end_date:
+            return self.IC_contract_end_date[future_code]
         return jq.get_security_info(future_code.replace("CFFEX", "CCFX")).end_date
 
     def on_order(self, order: OrderData):

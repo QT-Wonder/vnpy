@@ -22,6 +22,10 @@ from vnpy.trader.utility import extract_vt_symbol, round_to
 
 from vnpy.trader.setting import SETTINGS
 
+from vnpy.app.jq_api import jq_api_to_csv
+
+import csv
+
 from .base import (
     BacktestingMode,
     EngineType,
@@ -32,6 +36,7 @@ from .base import (
 )
 from .template import DynamicCtaTemplate
 import jqdatasdk as jq
+from pathlib import Path
 
 # Set seaborn style
 sns.set_style("whitegrid")
@@ -152,6 +157,18 @@ class BacktestingEngine:
         self.daily_results = {}
         self.daily_df = None
 
+        # load JQ API cache
+        cache_path = Path.cwd().joinpath('qtwonder').joinpath('IC_future_contract.csv')
+        if not cache_path.exists():
+            jq_api_to_csv.cache_jq_api('qtwonder')
+
+        self.IC_future_contract_list = []
+        with open(cache_path, newline='') as csvfile:
+            reader = csv.reader(csvfile, delimiter=',')
+            next(reader, None)
+            for row in reader:
+                self.IC_future_contract_list.append([datetime.strptime(row[0], "%Y-%m-%d").date(), datetime.strptime(row[1], "%Y-%m-%d").date(), row[2], row[3], row[4], row[5]])
+
     def clear_data(self):
         """
         Clear all data of last backtesting.
@@ -232,15 +249,20 @@ class BacktestingEngine:
         total_delta = self.end - self.start
         interval_delta = INTERVAL_DELTA_MAP[self.interval] if self.mode == BacktestingMode.BAR else timedelta(seconds=1)
 
+        data_start = datetime.strptime("2015-4-16", "%Y-%m-%d").date()
+        if self.start < data_start:
+            self.start = data_start
+            self.output("起始时间必须大于2015-4-16，已经设为2015-4-16")
+
         start = self.start
+
         end = start + timedelta(days=1)
         progress = 0
 
         while start < self.end:
-            # TODO, need remove the call to JQ API
-            future_contracts = jq.get_future_contracts(self.vt_symbol, start.strftime('%Y-%m-%d'))
+            future_contracts = self.get_future_contracts(start) 
             while(end < self.end):
-                next_future_contracts = jq.get_future_contracts(self.vt_symbol, end.strftime('%Y-%m-%d'))
+                next_future_contracts = self.get_future_contracts(end)
                 if next_future_contracts == future_contracts:
                     end = end + timedelta(days=1)
                 else:
@@ -282,6 +304,13 @@ class BacktestingEngine:
             end = start + timedelta(days=1)
 
         self.output("所有历史数据加载完成")
+
+    def get_future_contracts(self, date):
+        if self.vt_symbol == 'IC':
+            for item in self.IC_future_contract_list:
+                if date >= item[0] and date <= item[1]:
+                    return item[2:]
+        return jq.get_future_contracts(self.vt_symbol, date.strftime('%Y-%m-%d'))
 
     def from_jq_exchange(self, jq_symbol: str):
         symbole, exchange_str = jq_symbol.split('.')
